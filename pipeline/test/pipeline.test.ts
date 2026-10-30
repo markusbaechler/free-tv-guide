@@ -37,12 +37,14 @@ test('SRG-Normalisierung: Antwortformat laut OpenAPI (Array, isLive, replica)', 
   const payload = [
     { title: 'Fussball', shortDescription: 'Super League: FC Basel – YB', dateTimes: { startTime: '2026-11-01T16:15:00+01:00', endTime: '2026-11-01T18:30:00+01:00', duration: '135' }, isLive: true, replica: false },
     { title: 'Fussball', shortDescription: 'Super League: FC Basel – YB', dateTimes: { startTime: '2026-11-02T01:00:00+01:00', endTime: '2026-11-02T03:00:00+01:00' }, isLive: false, replica: true },
+    { title: 'FC Lucerne - FC Sion', subTitle: 'Super League <br>12e journée', shortDescription: 'lang', dateTimes: { startTime: '2026-10-31T20:10:00+01:00' } },
   ];
   const progs = extractPrograms(payload).map((r) => normalizeProgram(r, 'srf2'));
   assert.equal(progs[0]!.live, true);
   assert.equal(progs[0]!.subtitle, 'Super League: FC Basel – YB');
   assert.equal(progs[1]!.rerun, true);
   assert.equal(progs[0]!.end, '2026-11-01T17:30:00.000Z');
+  assert.equal(progs[2]!.subtitle, 'Super League · 12e journée');
 });
 
 test('SRG-Normalisierung: dateTimes, Genre-Objekte, fehlende Endzeit', () => {

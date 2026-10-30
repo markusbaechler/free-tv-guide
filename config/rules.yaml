@@ -10,10 +10,11 @@ exclude:
   - "talk\\b|sykora gisler"
   - "sportlounge|sportpanorama"
   - "quiz"
+  - "a tutto hockey"          # RSI-Magazin, keine Livespiele
 
 # Zusammenfassungen → kind: highlights
 highlights:
-  - "zusammenfassung|highlights?|r[ée]sum[ée]s?|sintesi|best of|analyse|analysis"
+  - "zusammenfassung|highlights?|r[ée]sum[ée]s?|sintesi|il meglio|best of|analyse|analysis"
 
 # Wiederholungen / Aufzeichnungen → kind: replay
 replay:
@@ -40,7 +41,7 @@ competitions:
   - id: motogp
     patterns: ["moto ?gp|moto ?2|moto ?3|motorrad-wm|motorradsport|motocyclisme|motociclismo"]
   - id: formula-1
-    patterns: ["formel ?1|formula ?1|\\bf1\\b|grand prix|gp [a-zäöü]"]
+    patterns: ["formel ?1|formula ?(1|uno)|\\bf1\\b|grand prix|gran premio|gp [a-zäöü]"]
     requireAny: ["formel|formula|\\bf1\\b|automobilsport|automobilisme|automobilismo"]
 
   - id: champions-league

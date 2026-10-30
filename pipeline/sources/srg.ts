@@ -2,7 +2,7 @@
 //   Token:  POST https://api.srgssr.ch/oauth/v1/accesstoken?grant_type=client_credentials  (Basic Auth)
 //   EPG:    GET  https://api.srgssr.ch/epg/v3/{bu}/tv/stations/{station}?date=YYYY-MM-DD
 // Antwort laut OpenAPI 3.0.8: Array von { title, shortDescription, longDescription, dateTimes{startTime,endTime},
-// isLive, replica, … }. Kein Genre-Feld. Trotzdem defensiv gelesen; Struktur in debug/srg-shape.json.
+// isLive, replica, … }. Tatsächlich zusätzlich: subTitle, genre (String), repetitionDescription. Trotzdem defensiv gelesen; Struktur in debug/srg-shape.json.
 
 import type { Program } from '../types.ts';
 import { toUtc } from '../time.ts';
@@ -77,7 +77,8 @@ export async function fetchDay(token: string, bu: string, station: string, date:
 
 function str(v: unknown): string | null {
   if (typeof v === 'string') {
-    const t = v.trim();
+    // RTS liefert <br> im Text, RSI Zeilenumbrüche ohne Leerzeichen
+    const t = v.replace(/<br\s*\/?>/gi, ' · ').replace(/<[^>]+>/g, '').replace(/\s*[\r\n]+\s*/g, ' · ').replace(/\s+/g, ' ').trim();
     return t === '' ? null : t;
   }
   return null;
@@ -127,11 +128,11 @@ export function normalizeProgram(raw: unknown, channel: string): Program | null 
     start,
     end: toUtc(dt.endTime ?? o.endTime ?? o.end),
     title,
-    subtitle: str(o.subtitle) ?? str(o.episodeTitle) ?? str(o.shortDescription),
+    subtitle: str(o.subTitle) ?? str(o.subtitle) ?? str(o.episodeTitle) ?? str(o.shortDescription),
     description: (str(o.longDescription) ?? str(o.description) ?? str(o.lead) ?? '').slice(0, 300) || null,
     genre: genreText(o.genre ?? o.genres ?? o.category ?? o.categories ?? o.contentClassification),
     live: bool(o.isLive) ?? bool(o.live) ?? bool(o.liveBroadcast),
-    rerun: bool(o.replica) ?? bool(o.isRerun) ?? bool(o.rerun),
+    rerun: bool(o.replica) ?? bool(o.isRerun) ?? bool(o.rerun) ?? (str(o.repetitionDescription) ? true : null),
   };
 }
 
