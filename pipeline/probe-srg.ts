@@ -8,21 +8,14 @@ const token = await getToken(id, secret);
 const d = new Date().toISOString().slice(0, 10);
 
 const paths = [
-  `/epg/v3/srf/tv/stations/srf-1?date=${d}`,
-  `/epg/v3/srf/tv/stations/srf1?date=${d}`,
-  `/epg/v3/srf/tv/stations?date=${d}`,
-  `/epg/v3/srf/tv/stations`,
-  `/epg/v3/srf/stations/srf-1?date=${d}`,
-  `/epg/v3/srf/tv/programs?station=srf-1&date=${d}`,
-  `/epg/v3/srf/programs?channel=srf-1&date=${d}`,
-  `/epg/v3/programs?bu=srf&channel=srf-1&date=${d}`,
-  `/epg/v3/srf/tv/schedules/srf-1?date=${d}`,
-  `/epg/v3/srf/tv/channels/srf-1?date=${d}`,
-  `/epg/v2/srf/tv/stations/srf-1?date=${d}`,
-  `/epg/v2/programs?bu=srf&channel=srf1&date=${d}`,
-  `/epg/v1/srf/tv/stations/srf-1?date=${d}`,
-  `/srgssr-epg/v3/srf/tv/stations/srf-1?date=${d}`,
-  `/rts-epg/v1/schedules/day?date=${d}`,
+  // Vergleich: andere APIs desselben Produkts → zeigt, ob das Token generell Rechte hat
+  `/videometadata/v2/tv_channels?bu=srf`,
+  `/polis-api/v2/votations/1?lang=de`,
+  `/audiometadata/v2/livestreams?bu=srf`,
+  // EPG nochmals mit Radio und RTS/RSI
+  `/epg/v3/srf/radio/stations/srf-3?date=${d}`,
+  `/epg/v3/rts/tv/stations/rts-1?date=${d}`,
+  `/epg/v3/rsi/tv/stations/la-1?date=${d}`,
 ];
 
 // Run-Logs sind von hier aus nicht lesbar, Annotationen schon → Ergebnisse als ::notice:: (max. 10 pro Schritt)
