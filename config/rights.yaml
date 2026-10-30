@@ -1,0 +1,121 @@
+# Free-TV-Rechte in der Schweiz. EINZIGE Stelle für Rechteänderungen (keine Code-Änderung nötig).
+# Ein Event erscheint im Guide nur, wenn:
+#   - sein Wettbewerb hier steht,
+#   - der Sender in `channels` steht,
+#   - das Startdatum in [validFrom, validUntil] liegt.
+# reception: ok | uncertain  (uncertain = Empfang über Zattoo Free CH nicht verifiziert)
+# Jährlich im Juli prüfen. Stand: 30.10.2026.
+
+srg: &srg [srf1, srf2, srfinfo, rts1, rts2, rsila1, rsila2]
+
+competitions:
+  # ---------- Fussball ----------
+  super-league:
+    name: Super League
+    sport: football
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2030-06-30          # SRG: 1 Spiel pro Runde (blue Sport-Sublizenz bis 2030)
+    reception: ok
+  super-league-women:
+    name: Women's Super League
+    sport: football
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30          # Annahme, verifizieren
+    reception: ok
+  challenge-league:
+    name: Challenge League
+    sport: football
+    channels: [bluezoom]
+    validFrom: 2026-07-01
+    validUntil: 2030-06-30          # blue Zoom: Top-Partie pro Spieltag
+    reception: uncertain            # blue Zoom in Zattoo Free CH nicht verifiziert
+  champions-league:
+    name: UEFA Champions League
+    sport: football
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30          # 1 Spiel pro Runde + Final. Ab 2027/28 keine CL mehr bei SRF
+    reception: ok
+  europa-league:
+    name: UEFA Europa League
+    sport: football
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30
+    reception: ok
+  conference-league:
+    name: UEFA Conference League
+    sport: football
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30
+    reception: ok
+  nati-football:
+    name: Nati (Fussball)
+    sport: football
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30          # Annahme, verifizieren
+    reception: ok
+  bundesliga:
+    name: Bundesliga
+    sport: football
+    channels: [sat1, daserste, zdf, *srg]
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30
+    reception: uncertain            # Ob Sat.1/ARD/ZDF die Spiele im CH-Signal zeigen, ist offen
+
+  # ---------- Eishockey ----------
+  national-league:
+    name: National League
+    sport: icehockey
+    channels: [tv24, 3plus, *srg]
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30          # Free-TV-Partner von MySports; SRG ohne Livespiele
+    reception: uncertain
+  nhl:
+    name: NHL
+    sport: icehockey
+    channels: [tv24, 3plus]
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30          # CH Media: bis 20 Spiele pro Saison
+    reception: uncertain
+  nati-icehockey:
+    name: Nati / WM (Eishockey)
+    sport: icehockey
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2028-06-30          # WM-Rechte SRG bis 2028
+    reception: ok
+  spengler-cup:
+    name: Spengler Cup
+    sport: icehockey
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30
+    reception: ok
+  champions-hockey-league:
+    name: Champions Hockey League
+    sport: icehockey
+    channels: *srg
+    validFrom: 2026-07-01
+    validUntil: 2027-06-30
+    reception: ok
+
+  # ---------- Motorsport ----------
+  formula-1:
+    name: Formel 1
+    sport: motorsport
+    channels: *srg
+    validFrom: 2026-01-01
+    validUntil: 2026-12-31          # 2027 verifizieren
+    reception: ok
+  motogp:
+    name: MotoGP
+    sport: motorsport
+    channels: *srg
+    validFrom: 2026-01-01
+    validUntil: 2026-12-31          # 2027+ unsicher (RTL-Deal 2027–2030)
+    reception: ok

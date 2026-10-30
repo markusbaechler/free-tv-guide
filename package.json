@@ -1,0 +1,23 @@
+{
+  "name": "free-tv-guide",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Free-TV- und Sport-Guide für Samsung Tizen (Schweiz)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "pipeline": "node pipeline/main.ts",
+    "test": "node --test \"pipeline/test/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,28 @@
+# Senderliste für den Tab «Sender».
+# epg:      "srg:<bu>:<station>" = Programmdaten aus der SRG SSR EPG API, null = keine EPG-Quelle
+# zattoo:   slot = Programmplatz in Zattoo (Phase 4 am TV ermitteln), deeplink = Launch-Parameter (Phase 4)
+# verified: false = Verfügbarkeit in Zattoo Free CH noch nicht am TV geprüft
+
+channels:
+  - { id: srf1,     name: "SRF 1",      country: CH, epg: "srg:srf:srf-1",    zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: srf2,     name: "SRF zwei",   country: CH, epg: "srg:srf:srf-2",    zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: srfinfo,  name: "SRF info",   country: CH, epg: "srg:srf:srf-info", zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: rts1,     name: "RTS 1",      country: CH, epg: "srg:rts:rts-1",    zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: rts2,     name: "RTS 2",      country: CH, epg: "srg:rts:rts-2",    zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: rsila1,   name: "RSI LA 1",   country: CH, epg: "srg:rsi:la-1",     zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: rsila2,   name: "RSI LA 2",   country: CH, epg: "srg:rsi:la-2",     zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: tv24,     name: "TV24",       country: CH, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: 3plus,    name: "3+",         country: CH, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: bluezoom, name: "blue Zoom",  country: CH, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: daserste, name: "Das Erste",  country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: zdf,      name: "ZDF",        country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: 3sat,     name: "3sat",       country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: rtl,      name: "RTL",        country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: sat1,     name: "Sat.1",      country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: prosieben, name: "ProSieben", country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: vox,      name: "VOX",        country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: kabeleins, name: "kabel eins", country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: rtlzwei,  name: "RTL Zwei",   country: DE, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: orf1,     name: "ORF 1",      country: AT, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: orf2,     name: "ORF 2",      country: AT, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: servustv, name: "ServusTV",   country: AT, epg: null, zattoo: { slot: null, deeplink: null }, verified: false }

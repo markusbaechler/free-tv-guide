@@ -1,0 +1,10 @@
+node_modules/
+out/
+app/dist/
+*.log
+.env
+# Tizen-Zertifikate und Signierprofile nie committen
+*.p12
+author.p12
+distributor.p12
+profiles.xml

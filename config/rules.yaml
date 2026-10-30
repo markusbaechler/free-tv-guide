@@ -1,0 +1,69 @@
+# Klassifizierung von EPG-Sendungen. Alle Muster sind Regex, Gross/Kleinschreibung egal.
+# Geprüft wird der kombinierte Text aus Titel, Untertitel, Beschreibung und Genre.
+# Reihenfolge der Wettbewerbe = Priorität (spezifisch vor allgemein).
+
+# Sendungen, die nie als Event gelten (News, Talk, Magazine ohne Live-Sport)
+exclude:
+  - "sportflash"
+  - "sport ?aktuell"
+  - "tagesschau|telegiornale|\\b19h30\\b|12h45"
+  - "talk\\b|sykora gisler"
+  - "sportlounge|sportpanorama"
+  - "quiz"
+
+# Zusammenfassungen → kind: highlights
+highlights:
+  - "zusammenfassung|highlights?|r[ée]sum[ée]s?|sintesi|best of|analyse|analysis"
+
+# Wiederholungen / Aufzeichnungen → kind: replay
+replay:
+  - "wiederholung|\\(w\\)|replay|rediffusion|\\breplica\\b|aufzeichnung|teilaufzeichnung|en diff[ée]r[ée]|differita"
+
+# Erste passende Regel gewinnt. requireAny: mindestens eines dieser Muster muss zusätzlich vorkommen.
+competitions:
+  - id: champions-hockey-league
+    patterns: ["champions hockey league|\\bchl\\b"]
+  - id: spengler-cup
+    patterns: ["spengler"]
+  - id: nhl
+    patterns: ["\\bnhl\\b"]
+  - id: nati-icehockey
+    patterns: ["eishockey-wm|eishockey-weltmeisterschaft|hockey.{0,20}(championnat du monde|mondiali|world championship)|ice hockey world"]
+  - id: national-league
+    patterns: ["national league"]
+    requireAny: ["eishockey|hockey"]
+  - id: nati-icehockey
+    patterns: ["\\bsui\\b|schweiz|suisse|svizzera|nati"]
+    requireAny: ["eishockey|hockey"]
+
+  # MotoGP vor Formel 1: beide nutzen «Grand Prix»
+  - id: motogp
+    patterns: ["moto ?gp|moto ?2|moto ?3|motorrad-wm|motorradsport|motocyclisme|motociclismo"]
+  - id: formula-1
+    patterns: ["formel ?1|formula ?1|\\bf1\\b|grand prix|gp [a-zäöü]"]
+    requireAny: ["formel|formula|\\bf1\\b|automobilsport|automobilisme|automobilismo"]
+
+  - id: champions-league
+    patterns: ["champions league|ligue des champions|lega dei campioni"]
+  - id: europa-league
+    patterns: ["europa league|ligue europa"]
+  - id: conference-league
+    patterns: ["conference league|ligue de conf[ée]rence"]
+  - id: super-league-women
+    patterns: ["women'?s super league|axa women"]
+  - id: challenge-league
+    patterns: ["challenge league"]
+  - id: super-league
+    patterns: ["super league"]
+    requireAny: ["fussball|football|calcio|super league"]
+  - id: bundesliga
+    patterns: ["bundesliga"]
+    requireAny: ["fussball|football|calcio|bundesliga"]
+  - id: nati-football
+    patterns: ["\\bsui\\b|schweiz|suisse|svizzera|nati|l[äa]nderspiel|nations league|wm-quali|em-quali|qualifications?"]
+    requireAny: ["fussball|football|calcio"]
+
+# Wenn kein Wettbewerb passt, aber eines dieser Muster vorkommt, landet die Sendung
+# in debug/unclassified.json (zur Pflege dieser Regeln). Erscheint NICHT im Guide.
+sportHints:
+  - "fussball|football|calcio|eishockey|hockey|formel|formula|motogp|motorsport|automobil|motorrad|moto"

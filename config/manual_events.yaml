@@ -1,0 +1,14 @@
+# Manuell gepflegte Events für Sender ohne EPG-Quelle (TV24, 3+, blue Zoom, Sat.1, ARD, ZDF …).
+# Diese Einträge laufen ebenfalls durch den Rechte-Filter (config/rights.yaml).
+# Zeiten in Schweizer Lokalzeit (Europe/Zurich) im Format "YYYY-MM-DD HH:MM".
+# Vergangene Einträge werden automatisch ignoriert und dürfen gelöscht werden.
+#
+# Beispiel:
+#   - competition: nhl
+#     title: "Nashville Predators – New York Rangers"
+#     channel: tv24
+#     start: "2026-11-08 18:00"
+#     end: "2026-11-08 21:00"          # optional, Standard: +2h30
+#     kind: live                        # live | highlights | replay, Standard: live
+
+events: []
