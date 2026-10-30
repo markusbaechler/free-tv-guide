@@ -4,7 +4,8 @@ import { clear, h } from './dom.ts';
 import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './focus.ts';
 import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
-import { CHANNEL_PRIORITY, PLAYERS, PLAYSRF_CHANNELS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
+import { CHANNEL_PRIORITY, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
+import { isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
 
 type Tab = 'live' | 'sport' | 'channels';
@@ -313,13 +314,51 @@ function rememberFocus(): void {
 }
 
 let pendingLaunch: { app: PlayerApp; deeplink: string | null } | null = null;
-let pendingPlaySrf: PlayerApp | null = null;
+
+/** Sender mit offiziellem SRG-Livestream, in Senderlisten-Reihenfolge (für Hoch/Runter im Player) */
+function playableChannels(): PlayableChannel[] {
+  const now = new Date();
+  const list = state.data ? state.data.channels : [];
+  return list
+    .filter((c) => c.live && c.live.urn)
+    .map((c) => {
+      const nn = state.data ? nowNext(state.data.epg[c.id], now) : { now: null, next: null };
+      return { id: c.id, name: c.name, urn: c.live!.urn, nowTitle: nn.now ? nn.now.title : null };
+    });
+}
+
+function canPlay(channelId: string): boolean {
+  const c = channelById(channelId);
+  return !!(c && c.live && c.live.urn);
+}
+
+function play(channelId: string): void {
+  if (state.overlay) {
+    // Dialog schliessen, ohne den Fokus zurückzusetzen; der Player merkt sich die Stelle
+    $('overlay').hidden = true;
+    clear($('overlay'));
+    state.overlay = null;
+  } else {
+    rememberFocus();
+  }
+  openPlayer(playableChannels(), channelId, () => {
+    render();
+    const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
+    if (back) setFocus(back);
+  });
+}
+
+/** Startet in weniger als 15 Minuten oder läuft schon → direkt abspielen */
+function startsSoon(g: EventGroup, now: Date): boolean {
+  return new Date(g.start).getTime() - now.getTime() < 15 * 60 * 1000;
+}
 
 function openWatch(channelId: string, title: string | null, g: EventGroup | null): void {
   rememberFocus();
   const ch = channelById(channelId);
   const name = ch ? ch.name : channelId;
   const now = new Date();
+  const playable = canPlay(channelId);
   const lines: HTMLElement[] = [];
   if (g && g.start > now.toISOString()) {
     const day = dayKey(g.start) === dayKey(now) ? 'heute' : dayLabel(dayKey(g.start), now);
@@ -332,13 +371,12 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   if (g && g.others.length) {
     lines.push(h('p', { class: 'dialog__muted' }, 'Auch auf ' + g.others.map((o) => channelName(o.channel)).join(', ') + '.'));
   }
-  const deeplink = ch ? ch.zattoo.deeplink : null;
-  if (!deeplink) {
+  if (!playable) {
+    // Nicht-SRG-Sender: nur über Zattoo Free (Werbung, 10 h pro Monat am TV)
     const slot = ch && ch.zattoo.slot ? ' (Programmplatz ' + ch.zattoo.slot + ')' : '';
-    lines.push(h('p', { class: 'dialog__hint' }, 'Zattoo öffnet ohne Senderwahl. Dort ' + name + slot + ' wählen.'));
+    lines.push(h('p', { class: 'dialog__hint' }, name + ' läuft nur über Zattoo Free: mit Werbung und höchstens 10 Stunden pro Monat am TV. Dort ' + name + slot + ' wählen.'));
   }
-  pendingLaunch = { app: PLAYERS.zattoo, deeplink };
-  pendingPlaySrf = PLAYSRF_CHANNELS.indexOf(channelId) !== -1 ? PLAYERS.playsrf : null;
+  pendingLaunch = { app: PLAYERS.zattoo, deeplink: ch ? ch.zattoo.deeplink : null };
 
   openOverlay(
     'watch',
@@ -351,8 +389,9 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
       h(
         'div',
         { class: 'dialog__actions' },
-        h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'launch:zattoo' }, 'Zattoo öffnen'),
-        pendingPlaySrf ? h('button', { class: 'btn', type: 'button', 'data-nav': true, 'data-key': 'launch:playsrf' }, 'Play SRF öffnen') : null,
+        playable
+          ? h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'play:' + channelId }, name + ' jetzt einschalten')
+          : h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'launch:zattoo' }, 'Zattoo öffnen'),
         h('button', { class: 'btn', type: 'button', 'data-nav': true, 'data-key': 'close' }, 'Abbrechen'),
       ),
     ),
@@ -428,12 +467,14 @@ function activate(el: HTMLElement): void {
   }
   if (kind === 'ev') {
     const g = groups().filter((x) => x.key === value)[0];
-    if (g) openWatch(g.primary.channel, displayTitle(g.primary), g);
-    return;
+    if (!g) return;
+    // Läuft oder beginnt gleich und SRG-Sender → sofort abspielen, sonst Dialog
+    if (canPlay(g.primary.channel) && startsSoon(g, new Date())) return play(g.primary.channel);
+    return openWatch(g.primary.channel, displayTitle(g.primary), g);
   }
-  if (kind === 'ch') return openWatch(value, null, null);
+  if (kind === 'ch') return canPlay(value) ? play(value) : openWatch(value, null, null);
+  if (kind === 'play') return play(value);
   if (key === 'launch:zattoo' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
-  if (key === 'launch:playsrf' && pendingPlaySrf) return doLaunch(pendingPlaySrf, null);
   if (key === 'close') return closeOverlay();
   if (key === 'exit') {
     if (!exitApp()) launchError('In der Vorschau gibt es nichts zu beenden.');
@@ -460,6 +501,10 @@ const KEY = { left: 37, up: 38, right: 39, down: 40, enter: 13, back: 10009, bac
 
 function onKey(e: KeyboardEvent): void {
   const code = e.keyCode;
+  if (playerKey(code)) {
+    e.preventDefault();
+    return;
+  }
   const dirs: Record<number, Dir> = { 37: 'left', 38: 'up', 39: 'right', 40: 'down' };
   if (dirs[code]) {
     e.preventDefault();
@@ -496,7 +541,7 @@ function refresh(): void {
   loadData().then((d) => {
     state.loading = false;
     if (d) state.data = d;
-    if (state.overlay) return renderStatus();
+    if (state.overlay || isPlaying()) return renderStatus();
     render();
     if (firstLoad && state.data) defaultFocus();
   });
@@ -517,6 +562,7 @@ function start(): void {
   refresh();
   setInterval(refresh, REFRESH_DATA_MS);
   setInterval(() => {
+    if (isPlaying()) return;
     if (!state.overlay) render();
     else renderStatus();
   }, REFRESH_VIEW_MS);

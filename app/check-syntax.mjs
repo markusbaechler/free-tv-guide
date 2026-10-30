@@ -33,17 +33,26 @@ function stripJs(src) {
     .replace(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g, '""');
 }
 
-export function checkDist(dist) {
-  const problems = [];
-  const js = readFileSync(join(dist, 'app.js'), 'utf8');
+function checkJs(dist, file, problems, allow = []) {
+  const js = readFileSync(join(dist, file), 'utf8');
   try {
     parse(js, { ecmaVersion: 2017, sourceType: 'script' });
   } catch (e) {
-    problems.push(`app.js ist kein gültiges ES2017: ${e.message}`);
+    problems.push(`${file} ist kein gültiges ES2017: ${e.message}`);
   }
   const code = stripJs(js);
-  for (const [re, label] of JS_FORBIDDEN) if (re.test(code)) problems.push(`app.js: ${label}`);
-  if (/^\s*(import|export)\s/m.test(code)) problems.push('app.js: ES-Module im Output');
+  for (const [re, label] of JS_FORBIDDEN) if (!allow.includes(label) && re.test(code)) problems.push(`${file}: ${label}`);
+  if (/^\s*(import|export)\s/m.test(code)) problems.push(`${file}: ES-Module im Output`);
+}
+
+export function checkDist(dist) {
+  const problems = [];
+  checkJs(dist, 'app.js', problems);
+  // player.js: globalThis wird per Banner nachgerüstet (erste Zeile des Bundles)
+  const player = readFileSync(join(dist, 'player.js'), 'utf8');
+  const polyfilled = player.startsWith("if(typeof globalThis==='undefined'){window.globalThis=window;}");
+  if (!polyfilled) problems.push('player.js: globalThis-Polyfill fehlt');
+  checkJs(dist, 'player.js', problems, polyfilled ? ['globalThis (Chrome 71)'] : []);
 
   const css = readFileSync(join(dist, 'style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
   for (const [re, label] of CSS_FORBIDDEN) if (re.test(css)) problems.push(`style.css: ${label}`);

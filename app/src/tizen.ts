@@ -29,7 +29,7 @@ export const isTizen = (): boolean => api() !== null;
 export function registerKeys(): void {
   const t = api();
   if (!t || !t.tvinputdevice) return;
-  const keys = ['ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue'];
+  const keys = ['ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue', 'ChannelUp', 'ChannelDown'];
   for (const k of keys) {
     try {
       t.tvinputdevice.registerKey(k);

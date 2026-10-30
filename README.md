@@ -1,7 +1,7 @@
 # free-tv-guide
 
 Privater Free-TV- und Sport-Guide für einen Samsung-Fernseher (Tizen) in der Schweiz.
-Die App zeigt, welche Spiele und Rennen **legal gratis** im Free-TV laufen, und startet zum Schauen die offizielle App (Zattoo Free / Play SRF). Sie spielt selbst nichts ab.
+Die App zeigt, welche Spiele und Rennen **legal gratis** im Free-TV laufen. SRF, RTS und RSI spielt sie selbst ab, über die offizielle SRG-Schnittstelle und den SRG-Player Pillarbox (ohne Zeitlimit). Andere Sender öffnet sie in der Zattoo-App.
 
 - Spezifikation: [SPEC.md](SPEC.md)
 - Arbeitsanweisung für Claude Code: [CLAUDE.md](CLAUDE.md)

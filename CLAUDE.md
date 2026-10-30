@@ -5,12 +5,12 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 ## Kontext
 
 - Tizen-Web-App für Samsung QE75Q70R (2019, Tizen 5.0, Chromium ~M63). Nutzer in der Schweiz.
-- Die App bündelt legale Free-TV-Programminfos. Wiedergabe nur über offizielle Apps (Zattoo, Play SRF).
+- Die App bündelt legale Free-TV-Programminfos. SRG-Sender spielt sie selbst ab (Pillarbox), andere Sender nur über die Zattoo-App.
 - Entwicklungs-PC: Windows. Skripte in PowerShell.
 
 ## Harte Regeln
 
-- Keine Stream-URLs, kein Abspielen fremder Streams, kein Umgehen von DRM oder Geoblocking, keine M3U- oder IPTV-Quellen.
+- Wiedergabe nur für SRG-Sender über SRG-API-URN + offiziellen Player Pillarbox. Keine anderen Streamquellen, keine Stream-URLs in Code/Daten, kein Umgehen von DRM, Geoblocking oder Werbung, keine M3U- oder IPTV-Quellen.
 - Keine Senderlogos, nur Text.
 - Secrets (`SRG_CLIENT_ID`, `SRG_CLIENT_SECRET`, Zertifikats-Passwörter) nie committen, loggen oder ausgeben.
 - Neue Datenquellen nur nach Prüfung der Nutzungsbedingungen. Ergebnis in SPEC.md §5.1 dokumentieren.
@@ -20,7 +20,8 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 ## Build-Regeln App
 
 - esbuild, Output als IIFE, `target: chrome63`.
-- Verboten im Output: `?.`, `??`, `flex`-`gap`, ES-Module. Nach jedem Build mit einem Skript auf diese Syntax prüfen.
+- Verboten im Output: `?.`, `??`, `flex`-`gap`, ES-Module. Nach jedem Build mit einem Skript auf diese Syntax prüfen (`app/check-syntax.mjs`, prüft `app.js` und `player.js`).
+- `player.js` (Pillarbox + video.js) wird lazy geladen; `globalThis` nur über den Build-Banner nachrüsten.
 - Jeder Zugriff auf `localStorage` in `try/catch`.
 - Testen im Browser mit 1920×1080 und reiner Tastatursteuerung (Pfeiltasten, Enter, Backspace = Return).
 

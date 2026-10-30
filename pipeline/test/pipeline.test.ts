@@ -75,6 +75,11 @@ test('SRG-Livestreams: Titel → Sender, Audio ignoriert', async () => {
   });
   assert.equal(list.length, 2);
   assert.equal(matchChannel('SRF zwei'), 'srf2');
+  // Echte Titel der API (30.10.2026)
+  assert.equal(matchChannel('SRF 1 Live'), 'srf1');
+  assert.equal(matchChannel('SRF info live'), 'srfinfo');
+  assert.equal(matchChannel('LA 2'), 'rsila2');
+  assert.equal(matchChannel('RTS Couleur 3 en direct'), null);
   assert.equal(matchChannel('Livestream für SRF info'), 'srfinfo');
   assert.equal(matchChannel('RSI LA 2'), 'rsila2');
   assert.equal(matchChannel('SRF Sport 1'), null);

@@ -24,6 +24,21 @@ await build({
   logLevel: 'warning',
 });
 
+// Player-Bundle (Pillarbox + video.js) separat, wird erst beim Abspielen geladen
+await build({
+  entryPoints: [join(APP, 'src', 'player-entry.ts')],
+  outfile: join(DIST, 'player.js'),
+  bundle: true,
+  format: 'iife',
+  target: ['es2017', 'chrome63'],
+  minify: true,
+  legalComments: 'none',
+  logLevel: 'warning',
+  // video.js nutzt globalThis (Chromium 71+) → für Chromium 63 nachrüsten
+  banner: { js: "if(typeof globalThis==='undefined'){window.globalThis=window;}" },
+});
+copyFileSync(join(APP, '..', 'node_modules', '@srgssr', 'pillarbox-web', 'dist', 'pillarbox.min.css'), join(DIST, 'player.css'));
+
 for (const f of ['index.html', 'style.css', 'config.xml', 'icon.png']) {
   copyFileSync(join(APP, f), join(DIST, f));
 }

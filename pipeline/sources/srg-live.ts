@@ -27,6 +27,7 @@ export function normalizeTitle(t: string): string {
   return t
     .toLowerCase()
     .replace(/^(livestream|live)\s+(für|de|di|von)?\s*/i, '')
+    .replace(/\s+(live|en direct|in diretta)$/i, '')
     .replace(/[^a-z0-9]/g, '');
 }
 

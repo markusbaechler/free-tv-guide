@@ -12,11 +12,12 @@ Eine Tizen-Web-App mit drei Bereichen:
 2. **Sport:** Alle **legal gratis** übertragenen Live-Events in Fussball, Eishockey und Motorsport.
 3. **Jetzt live:** Was in diesem Moment läuft, aus beiden Bereichen.
 
-**Die App spielt selbst nichts ab.** Mit der OK-Taste startet die offizielle Wiedergabe-App (primär **Zattoo Free CH**, sekundär **Play SRF**).
+**Wiedergabe (Entscheid 30.10.2026):** SRG-Sender spielt die App selbst ab (Pillarbox, ohne Zeitlimit, ohne Zusatzwerbung; die normale Senderwerbung bleibt Teil des Programms). Zattoo Free ist nur noch Ausweg für Nicht-SRG-Sender, weil es am TV auf **10 h pro Monat** begrenzt ist und beim Umschalten Werbung zeigt.
 
 ## 2. Harte Grenzen (nicht verhandelbar)
 
-- Keine Wiedergabe fremder Streams, kein Umgehen von DRM oder Geoblocking, keine inoffiziellen Streamquellen oder M3U-Listen.
+- Wiedergabe in der App **nur** für SRG-Sender (SRF, RTS, RSI) über die offizielle «SRGSSR Video»-API (Livestream-URN) und den offiziellen SRG-Player «Pillarbox», so wie es die SRG auf ihrem Entwicklerportal vorsieht. Keine anderen Streamquellen, keine Stream-URLs im Code oder in den Daten, kein Umgehen von DRM, Geoblocking oder Werbung, keine M3U-/IPTV-Listen.
+- Nicht-SRG-Sender (ARD, ZDF, ORF, RTL, Sat.1 …) nur über die offizielle Zattoo-App (Free: Werbung, 10 h/Monat am TV).
 - Keine Pay-TV-Inhalte im Sport-Guide. Ein Event erscheint nur, wenn es laut `rights.yaml` frei empfangbar ist.
 - Ausschliesslich private, nicht-kommerzielle Nutzung, wie es die Nutzungsbedingungen der SRG SSR API verlangen.
 - Keine Senderlogos (Markenrechte). Kacheln zeigen nur den Sendernamen als Text.
@@ -69,7 +70,15 @@ Eine Tizen-Web-App mit drei Bereichen:
 - Startliste: SRF 1, SRF zwei, SRF info, RTS 1, RTS 2, RSI LA 1, RSI LA 2, Das Erste, ZDF, 3sat, ORF 1, ORF 2, ServusTV, RTL, Sat.1, ProSieben, VOX, kabel eins, RTL Zwei, TV24, 3+, blue Zoom.
 - Ob jeder Sender in Zattoo Free CH enthalten ist, wird in Phase 4 am TV geprüft. Geprüfte Sender erhalten `verified: true`, fehlende werden aus channels.yaml entfernt.
 
-### 4.5 Aktion «OK»
+### 4.5 Aktion «OK» (neu ab 30.10.2026)
+
+- Event auf SRG-Sender, läuft oder beginnt in < 15 Min. → sofort Vollbild-Player.
+- Event später → Dialog «Beginnt um …» mit «<Sender> jetzt einschalten».
+- Sender-Kachel mit SRG-Livestream → sofort Player. Ohne → Dialog mit Zattoo-Hinweis (Werbung, 10 h/Monat).
+- Im Player: Hoch/Runter bzw. CH+/CH− wechselt zwischen den SRG-Sendern, OK zeigt Info, Zurück führt in den Guide.
+- Player-Code (Pillarbox + video.js, ~800 KB) liegt in `player.js` und wird erst beim ersten Abspielen geladen. `globalThis` wird für Chromium 63 per Banner nachgerüstet.
+
+### 4.5a Aktion «OK» (ursprünglich, nur noch für Nicht-SRG-Sender)
 
 1. Zattoo-App per `tizen.application.launchAppControl` starten, falls möglich mit Sender-Parameter.
 2. **Fallback**, falls kein Deep-Link möglich ist: App öffnen und Hinweis «In Zattoo Sender X wählen» einblenden. Optional mit Programmplatz aus `channels.yaml`.
@@ -112,6 +121,7 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 | SRG SSR EPG API v3 (developer.srgssr.ch) | EPG SRF 1, SRF zwei, SRF info, RTS 1/2, RSI LA 1/2 | Gratis-Registrierung, Produkt «SRG SSR PUBLIC API V2». Token: `POST https://api.srgssr.ch/oauth/v1/accesstoken?grant_type=client_credentials` (Basic Auth). Daten: `GET /epg/v3/{bu}/tv/stations/{station}?date=YYYY-MM-DD` | Fakt (OpenAPI 3.0.8 im Portal: Antwort = Array mit `title`, `subTitle`, `shortDescription`, `dateTimes`, `isLive`, `replica`, `genre`). **Achtung:** Das Produkt «SRG SSR PUBLIC API V2» allein deckt `/epg/v3` nicht ab (404.01.001 «not enough privilege»). Der App muss zusätzlich «SRGSSR EPG V3» zugeordnet sein (erledigt 30.10.2026). ToS (Portalseite): Nutzung für beliebige Zwecke inkl. Websites und Apps erlaubt; Quellenangabe in `meta.json`. Kontingent unbekannt |
 | EPG Nicht-SRG-Sender | TV24, 3+, blue Zoom, ARD, ZDF, RTL usw. | **Keine Quelle mit klaren Nutzungsbedingungen gefunden** (Phase 1). Scraping von TV-Zeitschriften oder Zattoo bewusst ausgeschlossen. Tab «Sender» zeigt dort nur den Namen | Entscheid |
 | `manual_events.yaml` | Einzelne Events ohne EPG-Quelle | Manuell | Fallback |
+| SRGSSR Video API v2 (`/videometadata/v2/livestreams?bu=…`) | Livestream-URN je SRG-Sender (für Pillarbox) | Gleiche Zugangsdaten wie EPG | Fakt. Portal: Livestreams dürfen in eigenen Websites und Apps abgespielt werden, mit Pillarbox |
 
 ### 5.2 Secrets (nur in GitHub Secrets, nie im Code oder Chat)
 
@@ -219,12 +229,13 @@ free-tv-guide/
 | 1 ✅ | Pipeline, Config, Workflow, Branch `data` (abgenommen 30.10.2026) | Claude | `events.json` wird automatisch erzeugt, enthält ≥ 1 Free-Event pro Sportart im 7-Tage-Fenster (sofern im Kalender vorhanden) |
 | 2 ✅ | Tizen-App, Browser-Vorschau 1920×1080 (abgenommen 30.10.2026) | Claude | Alle Tabs per Tastatur (Pfeiltasten, Enter, Backspace) bedienbar, Build ohne Syntax neuer als ES2017 |
 | 3 | Tizen Studio + TV-Extension, Samsung-Zertifikat (mit DUID des TVs), Entwicklermodus am TV (Apps → `12345` → Developer Mode ON, IP des PCs) | Nutzer, angeleitet | `sdb devices` zeigt den TV |
-| 4 | Build, Signieren, Installieren, Zattoo-Deep-Link testen, Sender-Verfügbarkeit prüfen | Claude Code lokal | App startet auf dem TV, OK öffnet Zattoo |
+| 4 | Build, Signieren, Installieren, SRG-Livestream am TV testen, Zattoo-App-ID für Nicht-SRG-Sender ermitteln | Claude Code lokal | App startet auf dem TV, OK spielt SRF zwei live ab |
 | 5 | Betrieb: jährliche Erinnerung «rights.yaml prüfen» (Juli) | Automatisch | Erinnerung aktiv |
 
 ## 9. Offene Punkte und Risiken
 
-1. **Zattoo-Deep-Link:** App-ID und Parameter unbekannt. Fallback ist definiert (4.5).
+1. **Zattoo-Deep-Link:** App-ID und Parameter unbekannt. Fallback ist definiert (4.5a). Betrifft nur noch Nicht-SRG-Sender.
+8. **Pillarbox auf Tizen 5.0 (Chromium ~63):** Bundle besteht die ES2017-Prüfung; ob MSE/EME (DRM) der SRG-Livestreams auf dem Q70R funktionieren, zeigt erst der Test am TV (Phase 4). Fallback: Livestream über das Handy per AirPlay.
 2. **EPG für Nicht-SRG-Sender:** keine Quelle mit klaren Nutzungsbedingungen. NHL, National League (TV24/3+), Challenge League (blue Zoom) und Bundesliga (Sat.1) nur über `manual_events.yaml`.
 7. **SRG-Feldnamen und Kontingent:** nicht offiziell dokumentiert. Pipeline liest defensiv, protokolliert die Struktur in `debug/srg-shape.json`; Regeln nach dem ersten echten Lauf anhand von `debug/unclassified.json` nachschärfen.
 3. **Bundesliga in CH:** Free-Empfang unklar. Im Guide als «Empfang unsicher» markieren, bis in Phase 4 verifiziert.

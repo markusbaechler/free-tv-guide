@@ -389,3 +389,36 @@ button {
 .dialog__hint { color: var(--muted); font-size: 28px; }
 .dialog .dialog__error { color: var(--focus); min-height: 1.3em; margin-top: 20px; }
 .dialog__actions { margin-top: 24px; }
+
+/* ---------- Eingebauter Player (SRG-Livestreams) ---------- */
+
+.player {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  background: #000;
+  z-index: 10;
+}
+.player[hidden] { display: none; }
+.player .video-js { width: 1920px; height: 1080px; }
+/* Fehler zeigt die eigene Info-Leiste, nicht video.js */
+.player .vjs-error-display,
+.player .vjs-loading-spinner { display: none; }
+
+.pinfo {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1920px;
+  padding: 40px 96px 48px;
+  background: rgba(5, 16, 31, 0.86);
+  border-top: 8px solid var(--focus);
+  z-index: 2;
+}
+.pinfo[hidden] { display: none; }
+.pinfo__name { font-size: 48px; font-weight: 700; }
+.pinfo__now { font-size: 32px; color: var(--muted); margin-top: 4px; }
+.pinfo__msg { font-size: 32px; color: var(--focus); margin-top: 16px; }
+.pinfo__keys { font-size: 24px; color: var(--muted); margin-top: 20px; }

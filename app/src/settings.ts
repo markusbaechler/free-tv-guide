@@ -19,10 +19,7 @@ export interface PlayerApp {
   tizenId: string | null;
 }
 
-export const PLAYERS: { zattoo: PlayerApp; playsrf: PlayerApp } = {
+/** Nur noch für Sender ohne SRG-Livestream (ARD, ZDF, RTL …). SRG-Sender spielt die App selbst ab. */
+export const PLAYERS: { zattoo: PlayerApp } = {
   zattoo: { name: 'Zattoo', tizenId: null },
-  playsrf: { name: 'Play SRF', tizenId: null },
 };
-
-/** Sender, die Play SRF live zeigt */
-export const PLAYSRF_CHANNELS = ['srf1', 'srf2', 'srfinfo'];

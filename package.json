@@ -17,6 +17,8 @@
     "app:standalone": "node app/build.mjs && node app/build-preview.mjs out out/free-tv-guide-vorschau.html"
   },
   "dependencies": {
+    "@srgssr/pillarbox-web": "^1.40.4",
+    "video.js": "^8.21.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
