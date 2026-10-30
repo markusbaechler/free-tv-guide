@@ -1,0 +1,25 @@
+name: SRG-Diagnose (temporär)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['pipeline/probe-srg.ts']
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - env:
+          SRG_CLIENT_ID: ${{ secrets.SRG_CLIENT_ID }}
+          SRG_CLIENT_SECRET: ${{ secrets.SRG_CLIENT_SECRET }}
+        run: node pipeline/probe-srg.ts
