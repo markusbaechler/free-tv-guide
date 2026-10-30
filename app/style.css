@@ -1,0 +1,391 @@
+/* Free-TV Guide · 10-Fuss-UI für 1920×1080, Chromium ~63
+   Regeln: kein flex-gap, kein inset, keine clamp()/min()/max(), kein :focus-visible. */
+
+:root {
+  --bg: #0b2240;
+  --board: #123059;
+  --board-line: rgba(214, 228, 247, 0.14);
+  --ink: #f3f7fc;
+  --muted: #a3b6cf;
+  --faint: #6f88a8;
+  --focus: #ffc928;
+  --focus-ink: #0b2240;
+  --football: #3cc36f;
+  --icehockey: #8fd6ff;
+  --motorsport: #ff5d50;
+  --font: "SamsungOneUI", "Samsung One", "Tizen Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 30px;
+  line-height: 1.25;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 1080px;
+  padding: 48px 96px 0;
+}
+
+/* ---------- Kopfzeile ---------- */
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 96px;
+  flex: 0 0 auto;
+}
+
+.tabs { display: flex; }
+
+.tab {
+  font-size: 36px;
+  font-weight: 600;
+  padding: 14px 32px;
+  margin-right: 12px;
+  border-radius: 40px;
+  color: var(--muted);
+}
+.tab.is-active { color: var(--ink); box-shadow: inset 0 -5px 0 var(--ink); border-radius: 0; }
+.tab.is-focused { background: var(--focus); color: var(--focus-ink); box-shadow: none; border-radius: 40px; }
+
+.status { text-align: right; }
+.status__clock {
+  display: block;
+  font-size: 40px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+.status__data { display: block; font-size: 24px; color: var(--muted); }
+.status__data.is-offline { color: var(--focus); }
+
+/* ---------- Hauptbereich ---------- */
+
+.main {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  margin-top: 24px;
+}
+
+.sport {
+  display: grid;
+  grid-template-columns: 330px 1fr;
+  grid-column-gap: 56px;
+  height: 100%;
+}
+
+/* Filter */
+.filters { padding-top: 8px; }
+.filters__head {
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--faint);
+  margin: 28px 0 8px 20px;
+}
+.filters__head:first-child { margin-top: 0; }
+
+.filter {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 30px;
+  color: var(--muted);
+}
+.filter.is-active { color: var(--ink); font-weight: 600; }
+.filter.is-focused { background: var(--focus); color: var(--focus-ink); }
+
+.filter__swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin-right: 16px;
+  flex: 0 0 auto;
+}
+.filter__swatch--football { background: var(--football); }
+.filter__swatch--icehockey { background: var(--icehockey); }
+.filter__swatch--motorsport { background: var(--motorsport); }
+
+.filter--toggle { font-size: 26px; line-height: 1.2; }
+.check {
+  width: 30px;
+  height: 30px;
+  border: 3px solid currentColor;
+  border-radius: 6px;
+  margin-right: 16px;
+  flex: 0 0 auto;
+  position: relative;
+}
+.check.is-on::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 1px;
+  width: 8px;
+  height: 16px;
+  border: solid currentColor;
+  border-width: 0 4px 4px 0;
+  transform: rotate(45deg);
+}
+
+/* Abfahrtstafel */
+.board,
+.live-view,
+.channels-view {
+  height: 100%;
+  overflow: hidden;
+  padding-bottom: 40px;
+}
+
+.board__day,
+.section-head {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 28px 0 12px;
+}
+.board__day:first-child,
+.section-head:first-child { margin-top: 0; }
+
+.row {
+  display: flex;
+  align-items: center;
+  min-height: 112px;
+  padding: 14px 28px 14px 0;
+  margin-bottom: 8px;
+  background: var(--board);
+  border-radius: 10px;
+  border-left: 10px solid var(--faint);
+}
+.row--football { border-left-color: var(--football); }
+.row--icehockey { border-left-color: var(--icehockey); }
+.row--motorsport { border-left-color: var(--motorsport); }
+
+.row.is-secondary { background: rgba(18, 48, 89, 0.55); }
+
+.row__time {
+  flex: 0 0 210px;
+  padding-left: 28px;
+  font-size: 54px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.row__when {
+  display: block;
+  margin-top: 10px;
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.row__body { flex: 1 1 auto; min-width: 0; padding-right: 32px; }
+
+.row__comp {
+  display: flex;
+  align-items: center;
+  font-size: 24px;
+  color: var(--muted);
+}
+.sport-mark { display: none; }
+
+.row__title {
+  font-size: 40px;
+  font-weight: 600;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row__sub {
+  font-size: 24px;
+  color: var(--muted);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row__channel {
+  flex: 0 0 300px;
+  text-align: right;
+}
+.chan {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 3px solid var(--ink);
+  border-radius: 8px;
+  font-size: 30px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.row__also {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  color: var(--muted);
+}
+
+.live {
+  margin-left: 16px;
+  padding: 2px 12px;
+  border-radius: 6px;
+  background: var(--motorsport);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+}
+.tag {
+  margin-left: 16px;
+  padding: 0 12px;
+  border-radius: 6px;
+  border: 2px solid var(--muted);
+  font-size: 20px;
+}
+
+/* Fokus: ganze Zeile wird gelb – auf 4 m Distanz eindeutig */
+.row.is-focused { background: var(--focus); color: var(--focus-ink); }
+.row.is-focused .row__comp,
+.row.is-focused .row__sub,
+.row.is-focused .row__when,
+.row.is-focused .row__also { color: var(--focus-ink); }
+.row.is-focused .chan { border-color: var(--focus-ink); }
+.row.is-focused .tag { border-color: var(--focus-ink); }
+
+/* Kacheln */
+.tiles {
+  display: grid;
+  /* minmax(0, …): lange Titel dürfen die Spalten nicht aufblähen */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-gap: 16px;
+}
+.tile {
+  min-width: 0;
+  min-height: 168px;
+  padding: 20px 24px;
+  background: var(--board);
+  border-radius: 10px;
+}
+.tile__name { font-size: 34px; font-weight: 700; }
+.tile__now { margin-top: 10px; font-size: 26px; }
+.tile__now--none { color: var(--faint); }
+.tile__title {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile__time,
+.tile__next {
+  display: block;
+  font-size: 22px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile__next { margin-top: 6px; white-space: pre; }
+.tile.is-focused { background: var(--focus); color: var(--focus-ink); }
+.tile.is-focused .tile__time,
+.tile.is-focused .tile__next,
+.tile.is-focused .tile__now--none { color: var(--focus-ink); }
+
+/* Hinweise */
+.note { color: var(--muted); font-size: 30px; margin: 12px 0 24px; }
+.note--center { text-align: center; margin-top: 240px; }
+
+.empty { padding: 120px 0 0 40px; max-width: 1100px; }
+.empty p { font-size: 36px; margin: 0 0 32px; }
+
+.btn {
+  display: inline-block;
+  padding: 16px 36px;
+  margin-right: 20px;
+  border-radius: 12px;
+  border: 3px solid var(--muted);
+  font-size: 30px;
+  font-weight: 600;
+}
+.btn--primary { border-color: var(--ink); }
+.btn.is-focused { background: var(--focus); border-color: var(--focus); color: var(--focus-ink); }
+
+/* ---------- Fusszeile: Farbtasten ---------- */
+
+.keys {
+  display: flex;
+  align-items: center;
+  height: 80px;
+  flex: 0 0 auto;
+  border-top: 2px solid var(--board-line);
+  font-size: 24px;
+  color: var(--muted);
+}
+.key { display: flex; align-items: center; margin-right: 44px; }
+.key b { color: var(--ink); font-weight: 600; margin-right: 8px; }
+.key__cap {
+  width: 34px;
+  height: 22px;
+  border-radius: 5px;
+  margin-right: 12px;
+}
+.key__cap--red { background: #e53935; }
+.key__cap--green { background: #43a047; }
+.key__cap--yellow { background: #fdd835; }
+.key__cap--blue { background: #1e88e5; }
+
+/* ---------- Dialog ---------- */
+
+.overlay {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  background: rgba(5, 16, 31, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.overlay[hidden] { display: none; }
+
+.dialog {
+  width: 1100px;
+  padding: 56px 64px;
+  background: var(--board);
+  border-radius: 16px;
+  border-top: 10px solid var(--focus);
+}
+.dialog--small { width: 800px; }
+.dialog__title { font-size: 48px; margin: 0 0 24px; line-height: 1.15; }
+.dialog p { font-size: 32px; margin: 0 0 14px; }
+.dialog__muted { color: var(--muted); }
+.dialog__hint { color: var(--muted); font-size: 28px; }
+.dialog .dialog__error { color: var(--focus); min-height: 1.3em; margin-top: 20px; }
+.dialog__actions { margin-top: 24px; }

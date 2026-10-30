@@ -30,7 +30,8 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 - `npm run check` – Typecheck und Tests der Pipeline
 - Daten live: `https://raw.githubusercontent.com/markusbaechler/free-tv-guide/data/events.json` (bzw. `channels.json`, `epg.json`, `meta.json`)
 - `npm run app:build` – App nach `app/dist`
-- `npm run app:preview` – lokale Vorschau
+- `npm run app:preview` – lokale Vorschau auf http://localhost:8080 (Daten live; mit `?data=./data/` aus `app/dist/data/`)
+- `npm run app:standalone` – eigenständige Vorschau-Seite mit eingebetteten Daten aus `out/` (vorher `npm run pipeline`)
 - `scripts/tv/install.ps1` – Signieren, `sdb connect <TV-IP>`, Installieren, Starten
 
 ## Arbeitsweise

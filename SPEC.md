@@ -46,7 +46,7 @@ Eine Tizen-Web-App mit drei Bereichen:
 
 - Steuerung per Steuerkreuz mit eigenem Fokus-Manager (räumliche Navigation). Fokus immer sichtbar (≥ 4 px Rahmen).
 - **Return/Back:** eine Ebene zurück, auf dem Startscreen Dialog «Beenden?».
-- Optional: Farbtasten als Filter (rot = Fussball, grün = Eishockey, gelb = Motorsport, blau = alle). Tasten mit `tizen.tvinputdevice.registerKey` registrieren.
+- Farbtasten als Filter, Farbe = Sportfarbe: grün = Fussball, blau = Eishockey, rot = Motorsport, gelb = alle. Browser-Vorschau: 1 rot, 2 grün, 3 gelb, 4 blau. Tasten mit `tizen.tvinputdevice.registerKey` registrieren.
 
 ### 4.2 Tab «Jetzt live»
 
@@ -76,6 +76,14 @@ Eine Tizen-Web-App mit drei Bereichen:
 3. Für SRF-Sport-Livestreams ohne TV-Ausstrahlung: Play SRF starten (gleiches Muster).
 
 > **Offen:** Zattoo-Tizen-App-ID und unterstützte Deep-Link-Parameter. Wird in Phase 4 auf dem TV ermittelt (installierte Apps über `sdb shell` auflisten, Launch testen).
+
+### 4.5b Darstellung (Entscheid Phase 2)
+
+- Leitbild Abfahrtstafel: Startzeit gross links, Spiel in der Mitte, Sender rechts als Kasten. Gelb ist allein dem Fokus vorbehalten; Sportfarben grün (Fussball), eisblau (Eishockey), rot (Motorsport) als Randstreifen.
+- Gleiches Spiel auf SRF/RTS/RSI wird zu einer Zeile zusammengefasst (gleicher Wettbewerb und Typ, Start ≤ 45 Min. auseinander). Angezeigt wird der deutschsprachige Sender, die übrigen als «auch …».
+- Highlights und Wiederholungen sind standardmässig ausgeblendet (Schalter «Auch zeigen»).
+- Läuft im gewählten Zeitraum nichts, zeigt die Tafel die nächsten 5 Termine.
+- Navigation: hoch/runter bleibt in der Spalte; am Listenende bleibt der Fokus stehen.
 
 ### 4.6 Offline und Fehler
 
@@ -209,7 +217,7 @@ free-tv-guide/
 |---|---|---|---|
 | 0 | GitHub-Repo `free-tv-guide` (öffentlich), SRG-API-Konto und Key, Secrets setzen | Nutzer | Repo existiert, Secrets gesetzt (`meta.json` → `srg.status` ≠ `missing-credentials`) |
 | 1 ✅ | Pipeline, Config, Workflow, Branch `data` (abgenommen 30.10.2026) | Claude | `events.json` wird automatisch erzeugt, enthält ≥ 1 Free-Event pro Sportart im 7-Tage-Fenster (sofern im Kalender vorhanden) |
-| 2 | Tizen-App, Browser-Vorschau 1920×1080 | Claude | Alle Tabs per Tastatur (Pfeiltasten, Enter, Backspace) bedienbar, Build ohne Syntax neuer als ES2017 |
+| 2 ✅ | Tizen-App, Browser-Vorschau 1920×1080 (abgenommen 30.10.2026) | Claude | Alle Tabs per Tastatur (Pfeiltasten, Enter, Backspace) bedienbar, Build ohne Syntax neuer als ES2017 |
 | 3 | Tizen Studio + TV-Extension, Samsung-Zertifikat (mit DUID des TVs), Entwicklermodus am TV (Apps → `12345` → Developer Mode ON, IP des PCs) | Nutzer, angeleitet | `sdb devices` zeigt den TV |
 | 4 | Build, Signieren, Installieren, Zattoo-Deep-Link testen, Sender-Verfügbarkeit prüfen | Claude Code lokal | App startet auf dem TV, OK öffnet Zattoo |
 | 5 | Betrieb: jährliche Erinnerung «rights.yaml prüfen» (Juli) | Automatisch | Erinnerung aktiv |
