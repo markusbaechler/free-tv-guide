@@ -101,7 +101,7 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 
 | Quelle | Inhalt | Zugang | Status |
 |---|---|---|---|
-| SRG SSR EPG API v3 (developer.srgssr.ch) | EPG SRF 1, SRF zwei, SRF info, RTS 1/2, RSI LA 1/2 | Gratis-Registrierung, Produkt «SRG SSR PUBLIC API V2». Token: `POST https://api.srgssr.ch/oauth/v1/accesstoken?grant_type=client_credentials` (Basic Auth). Daten: `GET /epg/v3/{bu}/tv/stations/{station}?date=YYYY-MM-DD` | Fakt (OpenAPI 3.0.8 im Portal: Antwort = Array mit `title`, `shortDescription`, `dateTimes`, `isLive`, `replica`; kein Genre). **Achtung:** Das Produkt «SRG SSR PUBLIC API V2» allein deckt `/epg/v3` nicht ab (getestet 30.10.2026: Video/Audio/Polis = 200, EPG = 404.01.001 «not enough privilege»). Der App muss zusätzlich das EPG-Produkt zugeordnet werden. ToS (Portalseite): Nutzung für beliebige Zwecke inkl. Websites und Apps erlaubt; Quellenangabe in `meta.json`. Kontingent unbekannt |
+| SRG SSR EPG API v3 (developer.srgssr.ch) | EPG SRF 1, SRF zwei, SRF info, RTS 1/2, RSI LA 1/2 | Gratis-Registrierung, Produkt «SRG SSR PUBLIC API V2». Token: `POST https://api.srgssr.ch/oauth/v1/accesstoken?grant_type=client_credentials` (Basic Auth). Daten: `GET /epg/v3/{bu}/tv/stations/{station}?date=YYYY-MM-DD` | Fakt (OpenAPI 3.0.8 im Portal: Antwort = Array mit `title`, `subTitle`, `shortDescription`, `dateTimes`, `isLive`, `replica`, `genre`). **Achtung:** Das Produkt «SRG SSR PUBLIC API V2» allein deckt `/epg/v3` nicht ab (404.01.001 «not enough privilege»). Der App muss zusätzlich «SRGSSR EPG V3» zugeordnet sein (erledigt 30.10.2026). ToS (Portalseite): Nutzung für beliebige Zwecke inkl. Websites und Apps erlaubt; Quellenangabe in `meta.json`. Kontingent unbekannt |
 | EPG Nicht-SRG-Sender | TV24, 3+, blue Zoom, ARD, ZDF, RTL usw. | **Keine Quelle mit klaren Nutzungsbedingungen gefunden** (Phase 1). Scraping von TV-Zeitschriften oder Zattoo bewusst ausgeschlossen. Tab «Sender» zeigt dort nur den Namen | Entscheid |
 | `manual_events.yaml` | Einzelne Events ohne EPG-Quelle | Manuell | Fallback |
 
@@ -208,7 +208,7 @@ free-tv-guide/
 | Phase | Inhalt | Wer | Abnahme |
 |---|---|---|---|
 | 0 | GitHub-Repo `free-tv-guide` (öffentlich), SRG-API-Konto und Key, Secrets setzen | Nutzer | Repo existiert, Secrets gesetzt (`meta.json` → `srg.status` ≠ `missing-credentials`) |
-| 1 | Pipeline, Config, Workflow, Branch `data` | Claude | `events.json` wird automatisch erzeugt, enthält ≥ 1 Free-Event pro Sportart im 7-Tage-Fenster (sofern im Kalender vorhanden) |
+| 1 ✅ | Pipeline, Config, Workflow, Branch `data` (abgenommen 30.10.2026) | Claude | `events.json` wird automatisch erzeugt, enthält ≥ 1 Free-Event pro Sportart im 7-Tage-Fenster (sofern im Kalender vorhanden) |
 | 2 | Tizen-App, Browser-Vorschau 1920×1080 | Claude | Alle Tabs per Tastatur (Pfeiltasten, Enter, Backspace) bedienbar, Build ohne Syntax neuer als ES2017 |
 | 3 | Tizen Studio + TV-Extension, Samsung-Zertifikat (mit DUID des TVs), Entwicklermodus am TV (Apps → `12345` → Developer Mode ON, IP des PCs) | Nutzer, angeleitet | `sdb devices` zeigt den TV |
 | 4 | Build, Signieren, Installieren, Zattoo-Deep-Link testen, Sender-Verfügbarkeit prüfen | Claude Code lokal | App startet auf dem TV, OK öffnet Zattoo |
