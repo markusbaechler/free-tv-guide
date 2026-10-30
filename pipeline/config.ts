@@ -44,11 +44,13 @@ export function loadChannels(dir: string): Channel[] {
     seen.add(id);
     if (!['CH', 'DE', 'AT'].includes(c.country)) fail(file, `${id}: country ungültig`);
     if (c.epg != null && !/^srg:(srf|rts|rsi):[A-Za-z0-9_-]+$/.test(c.epg)) fail(file, `${id}: epg ungültig`);
+    if (!['srg', 'joyn', 'zattoo'].includes(c.app)) fail(file, `${id}: app muss srg, joyn oder zattoo sein`);
     return {
       id,
       name: String(c.name),
       country: c.country,
       epg: c.epg ?? null,
+      app: c.app,
       zattoo: { slot: c.zattoo?.slot ?? null, deeplink: c.zattoo?.deeplink ?? null },
       verified: c.verified === true,
     };

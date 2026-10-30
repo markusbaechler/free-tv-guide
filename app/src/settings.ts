@@ -19,7 +19,14 @@ export interface PlayerApp {
   tizenId: string | null;
 }
 
-/** Nur noch für Sender ohne SRG-Livestream (ARD, ZDF, RTL …). SRG-Sender spielt die App selbst ab. */
-export const PLAYERS: { zattoo: PlayerApp } = {
+/** Externe Apps für Sender ohne SRG-Livestream. SRG-Sender spielt die App selbst ab. */
+export const PLAYERS: { joyn: PlayerApp; zattoo: PlayerApp } = {
+  joyn: { name: 'Joyn', tizenId: null },
   zattoo: { name: 'Zattoo', tizenId: null },
+};
+
+/** Hinweis im Dialog, je nach App */
+export const PLAYER_NOTE: { joyn: string; zattoo: string } = {
+  joyn: 'Läuft in der Joyn-App: gratis, ohne Zeitlimit, mit kurzen Werbespots vor dem Stream.',
+  zattoo: 'Läuft nur über Zattoo Free: mit Werbung beim Umschalten und höchstens 10 Stunden pro Monat am TV.',
 };

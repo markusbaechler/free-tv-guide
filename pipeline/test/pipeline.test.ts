@@ -12,6 +12,10 @@ const rights = loadRights(CONFIG, new Set(channels.map((c) => c.id)));
 
 test('Config lädt konsistent', () => {
   assert.ok(channels.length >= 20);
+  // SRG-Sender spielt die App selbst ab, ARD/ZDF/Private über Joyn
+  assert.equal(channels.find((c) => c.id === 'srf2')!.app, 'srg');
+  assert.equal(channels.find((c) => c.id === 'zdf')!.app, 'joyn');
+  assert.equal(channels.find((c) => c.id === 'orf1')!.app, 'zattoo');
   assert.doesNotThrow(() => loadRules(CONFIG, new Set(rights.keys())));
   // YAML-Anker in Listen werden flach gemacht
   assert.ok(rights.get('bundesliga')!.channels.includes('sat1'));

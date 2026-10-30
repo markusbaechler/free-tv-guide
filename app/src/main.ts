@@ -4,7 +4,7 @@ import { clear, h } from './dom.ts';
 import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './focus.ts';
 import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
-import { CHANNEL_PRIORITY, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
+import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
 import { isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
 
@@ -205,7 +205,7 @@ function channelTile(c: Channel, now: Date): HTMLElement {
     h('div', { class: 'tile__name' }, c.name),
     nn.now
       ? h('div', { class: 'tile__now' }, h('span', { class: 'tile__title' }, nn.now.title), nn.now.end ? h('span', { class: 'tile__time' }, 'bis ' + time(nn.now.end)) : null)
-      : h('div', { class: 'tile__now tile__now--none' }, c.epg ? 'Kein Programm verfügbar' : 'Programm in Zattoo'),
+      : h('div', { class: 'tile__now tile__now--none' }, c.epg ? 'Kein Programm verfügbar' : c.app === 'joyn' ? 'Über die Joyn-App' : 'Über die Zattoo-App'),
     nn.next ? h('div', { class: 'tile__next' }, time(nn.next.start) + '  ' + nn.next.title) : null,
   );
 }
@@ -371,12 +371,13 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   if (g && g.others.length) {
     lines.push(h('p', { class: 'dialog__muted' }, 'Auch auf ' + g.others.map((o) => channelName(o.channel)).join(', ') + '.'));
   }
+  // Nicht-SRG-Sender: Joyn (bevorzugt) oder Zattoo Free
+  const ext: 'joyn' | 'zattoo' = ch && ch.app === 'joyn' ? 'joyn' : 'zattoo';
   if (!playable) {
-    // Nicht-SRG-Sender: nur über Zattoo Free (Werbung, 10 h pro Monat am TV)
-    const slot = ch && ch.zattoo.slot ? ' (Programmplatz ' + ch.zattoo.slot + ')' : '';
-    lines.push(h('p', { class: 'dialog__hint' }, name + ' läuft nur über Zattoo Free: mit Werbung und höchstens 10 Stunden pro Monat am TV. Dort ' + name + slot + ' wählen.'));
+    const slot = ext === 'zattoo' && ch && ch.zattoo.slot ? ' (Programmplatz ' + ch.zattoo.slot + ')' : '';
+    lines.push(h('p', { class: 'dialog__hint' }, PLAYER_NOTE[ext] + ' Dort ' + name + slot + ' wählen.'));
   }
-  pendingLaunch = { app: PLAYERS.zattoo, deeplink: ch ? ch.zattoo.deeplink : null };
+  pendingLaunch = { app: PLAYERS[ext], deeplink: ext === 'zattoo' && ch ? ch.zattoo.deeplink : null };
 
   openOverlay(
     'watch',
@@ -391,7 +392,7 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
         { class: 'dialog__actions' },
         playable
           ? h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'play:' + channelId }, name + ' jetzt einschalten')
-          : h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'launch:zattoo' }, 'Zattoo öffnen'),
+          : h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'launch:ext' }, PLAYERS[ext].name + ' öffnen'),
         h('button', { class: 'btn', type: 'button', 'data-nav': true, 'data-key': 'close' }, 'Abbrechen'),
       ),
     ),
@@ -474,7 +475,7 @@ function activate(el: HTMLElement): void {
   }
   if (kind === 'ch') return canPlay(value) ? play(value) : openWatch(value, null, null);
   if (kind === 'play') return play(value);
-  if (key === 'launch:zattoo' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
+  if (key === 'launch:ext' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
   if (key === 'close') return closeOverlay();
   if (key === 'exit') {
     if (!exitApp()) launchError('In der Vorschau gibt es nichts zu beenden.');

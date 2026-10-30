@@ -12,12 +12,12 @@ Eine Tizen-Web-App mit drei Bereichen:
 2. **Sport:** Alle **legal gratis** übertragenen Live-Events in Fussball, Eishockey und Motorsport.
 3. **Jetzt live:** Was in diesem Moment läuft, aus beiden Bereichen.
 
-**Wiedergabe (Entscheid 30.10.2026):** SRG-Sender spielt die App selbst ab (Pillarbox, ohne Zeitlimit, ohne Zusatzwerbung; die normale Senderwerbung bleibt Teil des Programms). Zattoo Free ist nur noch Ausweg für Nicht-SRG-Sender, weil es am TV auf **10 h pro Monat** begrenzt ist und beim Umschalten Werbung zeigt.
+**Wiedergabe (Entscheid 30.10.2026, ergänzt um Joyn):** SRG-Sender spielt die App selbst ab (Pillarbox, ohne Zeitlimit, ohne Zusatzwerbung; die normale Senderwerbung bleibt Teil des Programms). Zattoo Free ist nur noch Ausweg für Nicht-SRG-Sender, weil es am TV auf **10 h pro Monat** begrenzt ist und beim Umschalten Werbung zeigt.
 
 ## 2. Harte Grenzen (nicht verhandelbar)
 
 - Wiedergabe in der App **nur** für SRG-Sender (SRF, RTS, RSI) über die offizielle «SRGSSR Video»-API (Livestream-URN) und den offiziellen SRG-Player «Pillarbox», so wie es die SRG auf ihrem Entwicklerportal vorsieht. Keine anderen Streamquellen, keine Stream-URLs im Code oder in den Daten, kein Umgehen von DRM, Geoblocking oder Werbung, keine M3U-/IPTV-Listen.
-- Nicht-SRG-Sender (ARD, ZDF, ORF, RTL, Sat.1 …) nur über die offizielle Zattoo-App (Free: Werbung, 10 h/Monat am TV).
+- Nicht-SRG-Sender nur über offizielle Apps: **Joyn Schweiz** (Das Erste, ZDF, 3sat, RTL CH, VOX CH, ProSieben, Sat.1, kabel eins, RTL Zwei, 3+ …; gratis, kurze Werbespots vor dem Stream, kein Zeitlimit bekannt), sonst **Zattoo Free** (ORF, ServusTV, TV24, blue Zoom; Werbung, 10 h/Monat am TV). Zuordnung je Sender in `channels.yaml` (`app`).
 - Keine Pay-TV-Inhalte im Sport-Guide. Ein Event erscheint nur, wenn es laut `rights.yaml` frei empfangbar ist.
 - Ausschliesslich private, nicht-kommerzielle Nutzung, wie es die Nutzungsbedingungen der SRG SSR API verlangen.
 - Keine Senderlogos (Markenrechte). Kacheln zeigen nur den Sendernamen als Text.
@@ -234,7 +234,8 @@ free-tv-guide/
 
 ## 9. Offene Punkte und Risiken
 
-1. **Zattoo-Deep-Link:** App-ID und Parameter unbekannt. Fallback ist definiert (4.5a). Betrifft nur noch Nicht-SRG-Sender.
+1. **Joyn-/Zattoo-App-ID und Deep-Link:** unbekannt, in Phase 4 am TV ermitteln. Fallback: App öffnet, Sender dort wählen.
+9. **Joyn Schweiz auf Samsung:** Joyn-App laut Herstellerangaben ab Samsung-Baujahr 2017; Verfügbarkeit im Schweizer Samsung-Store und Sport-Sperren (Geoblocking) bei ARD/ZDF über Joyn CH am TV prüfen.
 8. **Pillarbox auf Tizen 5.0 (Chromium ~63):** Bundle besteht die ES2017-Prüfung; ob MSE/EME (DRM) der SRG-Livestreams auf dem Q70R funktionieren, zeigt erst der Test am TV (Phase 4). Fallback: Livestream über das Handy per AirPlay.
 2. **EPG für Nicht-SRG-Sender:** keine Quelle mit klaren Nutzungsbedingungen. NHL, National League (TV24/3+), Challenge League (blue Zoom) und Bundesliga (Sat.1) nur über `manual_events.yaml`.
 7. **SRG-Feldnamen und Kontingent:** nicht offiziell dokumentiert. Pipeline liest defensiv, protokolliert die Struktur in `debug/srg-shape.json`; Regeln nach dem ersten echten Lauf anhand von `debug/unclassified.json` nachschärfen.
