@@ -23,7 +23,7 @@ export function classify(p: Program, rules: Rules): Classification | null {
 export function kindOf(p: Program, rules: Rules): Kind {
   const head = [p.title, p.subtitle].filter(Boolean).join(' · ');
   if (any(rules.highlights, head)) return 'highlights';
-  if (any(rules.replay, head) || p.live === false) return 'replay';
+  if (p.rerun === true || any(rules.replay, head) || p.live === false) return 'replay';
   return 'live';
 }
 

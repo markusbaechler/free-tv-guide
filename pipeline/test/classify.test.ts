@@ -11,7 +11,7 @@ const rights = loadRights(CONFIG, new Set(channels.map((c) => c.id)));
 const rules = loadRules(CONFIG, new Set(rights.keys()));
 
 function prog(title: string, extra: Partial<Program> = {}): Program {
-  return { channel: 'srf2', start: '2026-11-01T13:00:00.000Z', end: null, title, subtitle: null, description: null, genre: null, live: null, ...extra };
+  return { channel: 'srf2', start: '2026-11-01T13:00:00.000Z', end: null, title, subtitle: null, description: null, genre: null, live: null, rerun: null, ...extra };
 }
 
 const cases: Array<[string, Partial<Program>, string | null, string?]> = [
@@ -41,6 +41,10 @@ for (const [title, extra, competition, kind] of cases) {
 
 test('live=false aus der Quelle → replay', () => {
   assert.equal(classify(prog('Fussball – Super League, FCZ – GC', { live: false }), rules)?.kind, 'replay');
+});
+
+test('replica=true aus der Quelle → replay, auch wenn isLive fehlt', () => {
+  assert.equal(classify(prog('Formel 1 – GP Mexiko, Rennen', { rerun: true }), rules)?.kind, 'replay');
 });
 
 test('Beschreibung allein klassifiziert nicht', () => {

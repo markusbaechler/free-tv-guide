@@ -13,6 +13,8 @@ export interface Program {
   genre: string | null;
   /** true/false, falls die Quelle ein Live-Flag liefert, sonst null */
   live: boolean | null;
+  /** true = Wiederholung laut Quelle (SRG: `replica`), sonst false/null */
+  rerun: boolean | null;
 }
 
 export interface Channel {
