@@ -8,6 +8,7 @@ import { loadChannels, loadManualEvents, loadRights, loadRules } from './config.
 import { classify, isUnclassifiedSport } from './classify.ts';
 import { buildEvent, checkRights } from './rights.ts';
 import { extractPrograms, fetchDay, fillEndTimes, getToken, normalizeProgram, shapeOf, SrgError } from './sources/srg.ts';
+import { fetchLivestreams, matchChannel, type LiveStream } from './sources/srg-live.ts';
 import { addDays, zurichDate, zurichLocalToUtc } from './time.ts';
 import type { Channel, GuideEvent, Program } from './types.ts';
 
@@ -67,7 +68,7 @@ function needsFetch(date: string, cache: CacheEntry | null): boolean {
   return now.getTime() - new Date(cache.fetchedAt).getTime() > CACHE_MAX_AGE_H * 3600_000;
 }
 
-async function loadSrg(channels: Channel[]): Promise<{ programs: Program[]; status: SrgStatus; fetched: number; cached: number; failed: number }> {
+async function loadSrg(channels: Channel[]): Promise<{ programs: Program[]; status: SrgStatus; fetched: number; cached: number; failed: number; token: string | null }> {
   const srgChannels = channels.filter((c) => c.epg?.startsWith('srg:'));
   const dates = Array.from({ length: DAYS }, (_, i) => addDays(today, i));
   const id = process.env.SRG_CLIENT_ID;
@@ -124,7 +125,43 @@ async function loadSrg(channels: Channel[]): Promise<{ programs: Program[]; stat
 
   if (Object.keys(shapes).length) writeJson('debug/srg-shape.json', shapes);
   if (status === 'ok' && failed > 0) status = fetched > 0 ? 'partial' : 'error';
-  return { programs: all, status, fetched, cached, failed };
+  return { programs: all, status, fetched, cached, failed, token };
+}
+
+/** Livestream-URNs je Sender; bei Fehler die URNs aus dem letzten veröffentlichten Stand */
+async function loadLivestreams(token: string | null, channels: Channel[]): Promise<{ ok: number; failed: number }> {
+  let previous: Record<string, string> = {};
+  try {
+    const prev = JSON.parse(readFileSync(join(OUT_DIR, 'channels.json'), 'utf8')) as { channels: Channel[] };
+    for (const c of prev.channels) if (c.live) previous[c.id] = c.live.urn;
+  } catch {
+    previous = {};
+  }
+  const found: LiveStream[] = [];
+  let failed = 0;
+  if (token) {
+    for (const bu of ['srf', 'rts', 'rsi']) {
+      try {
+        found.push(...(await fetchLivestreams(token, bu)));
+      } catch (e) {
+        failed++;
+        warnings.push((e as Error).message);
+      }
+    }
+  }
+  const byChannel: Record<string, string> = {};
+  for (const l of found) {
+    const id = matchChannel(l.title);
+    if (id && !byChannel[id]) byChannel[id] = l.urn;
+  }
+  let ok = 0;
+  for (const c of channels) {
+    const urn = byChannel[c.id] ?? previous[c.id];
+    c.live = urn ? { urn } : null;
+    if (urn) ok++;
+  }
+  writeJson('debug/livestreams.json', found.map((l) => ({ ...l, channel: matchChannel(l.title) })));
+  return { ok, failed };
 }
 
 async function main(): Promise<void> {
@@ -138,6 +175,7 @@ async function main(): Promise<void> {
   pruneCache();
 
   const srg = await loadSrg(channels);
+  const live = await loadLivestreams(srg.token, channels);
   const nowIso = now.toISOString();
   const windowEnd = new Date(`${addDays(today, DAYS)}T00:00:00Z`).toISOString();
 
@@ -207,6 +245,7 @@ async function main(): Promise<void> {
     window: { from: today, days: DAYS },
     attribution: 'Programmdaten: SRG SSR (developer.srgssr.ch)',
     srg: { status: srg.status, fetchedDays: srg.fetched, cachedDays: srg.cached, failedDays: srg.failed },
+    livestreams: { channels: live.ok, failedRequests: live.failed },
     counts: { events: eventList.length, bySport, manual: eventList.filter((e) => e.source === 'manual').length, unclassified: unclassified.length, rejected: rejected.length },
     warnings,
   };

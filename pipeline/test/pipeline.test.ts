@@ -63,3 +63,19 @@ test('SRG-Normalisierung: dateTimes, Genre-Objekte, fehlende Endzeit', () => {
   assert.equal(filled[0]!.end, '2026-11-01T21:45:00.000Z');
   assert.equal(filled[1]!.end, '2026-11-01T22:00:00.000Z');
 });
+
+test('SRG-Livestreams: Titel → Sender, Audio ignoriert', async () => {
+  const { extractLivestreams, matchChannel } = await import('../sources/srg-live.ts');
+  const list = extractLivestreams('srf', {
+    mediaList: [
+      { urn: 'urn:srf:video:a', title: 'SRF 1', mediaType: 'VIDEO' },
+      { urn: 'urn:srf:video:b', title: 'SRF zwei', mediaType: 'VIDEO' },
+      { urn: 'urn:srf:audio:c', title: 'Radio SRF 3', mediaType: 'AUDIO' },
+    ],
+  });
+  assert.equal(list.length, 2);
+  assert.equal(matchChannel('SRF zwei'), 'srf2');
+  assert.equal(matchChannel('Livestream für SRF info'), 'srfinfo');
+  assert.equal(matchChannel('RSI LA 2'), 'rsila2');
+  assert.equal(matchChannel('SRF Sport 1'), null);
+});

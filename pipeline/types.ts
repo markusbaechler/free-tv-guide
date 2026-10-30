@@ -24,6 +24,8 @@ export interface Channel {
   epg: string | null;
   zattoo: { slot: number | null; deeplink: string | null };
   verified: boolean;
+  /** Offizieller SRG-Livestream (URN für den Pillarbox-Player), null = nicht in der App abspielbar */
+  live?: { urn: string } | null;
 }
 
 export interface CompetitionRight {
