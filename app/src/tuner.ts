@@ -247,14 +247,13 @@ function toIso(v: unknown): string | null {
 }
 
 /** Programm aus dem Sendesignal (DVB-EPG) für die nächsten Stunden, in der Form der App-EPG-Einträge */
-export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry[]> {
-  const t = tz();
-  if (!t || !t.tvchannel) return Promise.reject(new Error('tizen.tvchannel nicht vorhanden'));
+/** Ein Abruf ab `from` für `seconds`; Ergebnis roh umgewandelt (ohne Endzeit-Auffüllung) */
+function fetchProgramsOnce(t: TizenNs, ch: TunerChannel, from: Date, seconds: number): Promise<TunerEpgEntry[]> {
   return new Promise((resolve, reject) => {
     try {
       t.tvchannel!.getProgramList(
         ch.raw,
-        tzDate(t, new Date()) as Date,
+        tzDate(t, from) as Date,
         (list) => {
           const out: TunerEpgEntry[] = [];
           if (list.length || !lastEpgSample) {
@@ -267,21 +266,57 @@ export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry
             const end = dur > 0 ? new Date(new Date(start).getTime() + dur * 1000).toISOString() : toIso(p.endTime);
             out.push({ title: str(p.title) || 'Ohne Titel', subtitle: str(p.detailedDescription).slice(0, 120) || null, start, end });
           }
-          out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
-          // Fehlende Endzeit = Beginn der nächsten Sendung (wie in der Pipeline); letzte: +2 h
-          for (let i = 0; i < out.length; i++) {
-            const e = out[i]!;
-            if (e.end) continue;
-            const nxt = out[i + 1];
-            e.end = nxt ? nxt.start : new Date(new Date(e.start).getTime() + 2 * 3600 * 1000).toISOString();
-          }
           resolve(out);
         },
         (e) => reject(new Error('getProgramList: ' + e.message)),
-        hours * 3600,
+        seconds,
       );
     } catch (e) {
       reject(e instanceof Error ? e : new Error(String(e)));
     }
   });
+}
+
+/**
+ * Programm der nächsten `hours` Stunden. Der Fernseher liefert je Abruf nur einen Ausschnitt (am QE75Q70R ≈ 12 Einträge),
+ * deshalb wird in Zeitfenstern weitergelesen, bis nichts Neues mehr kommt oder das Fenster voll ist.
+ */
+export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry[]> {
+  const t = tz();
+  if (!t || !t.tvchannel) return Promise.reject(new Error('tizen.tvchannel nicht vorhanden'));
+  const limit = Date.now() + hours * 3600 * 1000;
+  const all: TunerEpgEntry[] = [];
+  const seen: Record<string, boolean> = {};
+  const step = (from: Date, round: number): Promise<TunerEpgEntry[]> => {
+    const seconds = Math.max(3600, Math.min(24 * 3600, Math.floor((limit - from.getTime()) / 1000)));
+    return fetchProgramsOnce(t, ch, from, seconds).then((chunk) => {
+      let added = 0;
+      let last: string | null = null;
+      for (const e of chunk) {
+        if (seen[e.start]) continue;
+        seen[e.start] = true;
+        all.push(e);
+        added++;
+        if (!last || e.start > last) last = e.start;
+      }
+      // Weiter ab der letzten Sendung (+1 s), solange etwas Neues kam und das Fenster nicht erreicht ist
+      if (added === 0 || !last || round >= 20) return finish(all);
+      const next = new Date(new Date(last).getTime() + 1000);
+      if (next.getTime() >= limit) return finish(all);
+      return step(next, round + 1);
+    });
+  };
+  const finish = (list: TunerEpgEntry[]): TunerEpgEntry[] => {
+    list.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+    // Fehlende Endzeit = Beginn der nächsten Sendung (wie in der Pipeline); letzte: +2 h
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i]!;
+      if (e.end) continue;
+      const nxt = list[i + 1];
+      e.end = nxt ? nxt.start : new Date(new Date(e.start).getTime() + 2 * 3600 * 1000).toISOString();
+    }
+    return list;
+  };
+  // Erster Abruf etwas in der Vergangenheit, damit die laufende Sendung sicher dabei ist
+  return step(new Date(Date.now() - 3 * 3600 * 1000), 0);
 }

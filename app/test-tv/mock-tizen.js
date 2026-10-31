@@ -54,11 +54,21 @@
           }, 5);
           return;
         }
-        var list = (epg[ch.channelName] || []).map(function (p) {
-          var o = { detailedDescription: p.description || '', title: p.title, startTime: new TZDate(p.start) };
-          if (p.durationSec) o.duration = p.durationSec;
-          return o;
-        });
+        // Wie der QE75Q70R: nur Sendungen ab Startzeit, höchstens 12 je Abruf
+        var fromMs = start._d.getTime();
+        var list = (epg[ch.channelName] || [])
+          .filter(function (p) {
+            return new Date(p.start).getTime() >= fromMs - 3600 * 1000;
+          })
+          .sort(function (a, b) {
+            return new Date(a.start) - new Date(b.start);
+          })
+          .slice(0, 12)
+          .map(function (p) {
+            var o = { detailedDescription: p.description || '', title: p.title, startTime: new TZDate(p.start) };
+            if (p.durationSec) o.duration = p.durationSec;
+            return o;
+          });
         setTimeout(function () {
           ok(list);
         }, 10);

@@ -38,7 +38,10 @@ const EPG = {
     { title: 'Tagesschau', description: 'Nachrichten', start: at(-0.5), durationSec: 900 },
     { title: 'Sportschau Bundesliga', description: 'Die Spiele des 9. Spieltags', start: at(-0.25) },
     { title: 'Tatort', description: 'Krimi', start: at(1.5) },
-  ],
+  ].concat(
+    // 5 Tage Füllprogramm (≈ 40 Einträge) + Bundesliga-Spiel am Tag 3 → nur mit Weiterlesen auffindbar
+    Array.from({ length: 40 }, (_, i) => ({ title: i === 25 ? 'Bundesliga: Relegation Hinspiel' : 'Sendung ' + i, description: '', start: at(3 + i * 3) })),
+  ),
   'ZDF HD': [{ title: 'heute journal', description: '', start: at(-0.2) }, { title: 'Das aktuelle Sportstudio', description: 'Bundesliga, 9. Spieltag', start: at(2) }],
   'SAT.1': [{ title: 'Promi Big Brother', description: 'Folge 5 Nach der Nominierung lockt eine wilde Halloweenparty', start: at(-1), durationSec: 7200 }],
   'SPORT1': [{ title: 'Bundesliga Pur', description: 'Der Tag', start: at(-0.5) }, { title: 'Darts', description: 'World Grand Prix', start: at(2) }],
@@ -93,6 +96,8 @@ const sport = await page.evaluate(() => document.querySelector('.board').innerTe
 if (process.env.DEBUG) console.log(sport);
 check(/ServusTV/.test(sport) && /Malaysia/.test(sport), 'MotoGP Malaysia auf ServusTV im Sport-Tab');
 check(/Das Erste/.test(sport) && /Sportschau Bundesliga/.test(sport), 'Sportschau Bundesliga (Das Erste) im Sport-Tab');
+check(/Relegation Hinspiel/.test(sport), 'Bundesliga-Spiel am Tag 3 gefunden (EPG in Fenstern weitergelesen, 12er-Limit je Abruf)');
+check(/Sat-EPG-Einträge: (4[0-9]|[5-9][0-9])/.test(diag), 'EPG-Einträge ≥ 40 trotz 12er-Limit je Abruf: ' + (diag.match(/Sat-EPG-Einträge: \d+/) || [''])[0]);
 check(!/Snooker/.test(sport), 'Snooker (keine Zielsportart) nicht im Sport-Tab');
 
 console.log('Sat-Sichtmodus und Zappen:');
