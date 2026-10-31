@@ -333,18 +333,23 @@ function refreshTunerEpg(): void {
   next();
 }
 
-function openSat(channelId: string): void {
+function openSat(channelId: string, done?: () => void): void {
   const m = state.tuner.matched[channelId];
   if (!m) return;
   if (state.overlay) closeOverlay();
-  else rememberFocus();
+  else if (!state.tuner.tvOpen) rememberFocus();
+  state.tuner.current = channelId;
+  zapCurrent = channelId;
   tuneTo(m).then(
     (r) => {
-      state.tuner.current = channelId;
       if (r !== 'ok') tunerLog('Tune ' + m.name + ': ' + r);
       if (!state.tuner.tvOpen) openTvWindow();
+      if (done) done();
     },
-    (e: Error) => tunerLog('Fehler ' + e.message),
+    (e: Error) => {
+      tunerLog('Fehler ' + e.message);
+      if (done) done();
+    },
   );
 }
 
@@ -356,18 +361,31 @@ function zapList(): Channel[] {
   });
 }
 
+/** Zuletzt angesteuerter Sender beim Zappen (sofort gesetzt, nicht erst nach erfolgreichem Umschalten) */
+let zapCurrent: string | null = null;
+/** Umschaltvorgang läuft: weitere Tastendrücke bis dahin ignorieren (sonst Wettlauf zwischen Tune/Player) */
+let zapBusyUntil = 0;
+
+function zapDone(): void {
+  zapBusyUntil = 0;
+}
+
 /** Hoch/Runter: nächster Sender der gemeinsamen Liste, unabhängig vom Empfangsweg */
 function zap(step: number): void {
+  const now = Date.now();
+  if (now < zapBusyUntil) return;
   const list = zapList();
   if (!list.length) return;
-  const current = state.tuner.tvOpen ? state.tuner.current : currentPlayerChannel();
+  const current = zapCurrent || (state.tuner.tvOpen ? state.tuner.current : currentPlayerChannel());
   const i = list.map((c) => c.id).indexOf(current || '');
   const nextCh = list[(i + step + list.length) % list.length]!;
   const w = firstWay(nextCh);
   if (!w) return;
+  zapCurrent = nextCh.id;
+  zapBusyUntil = now + 1500; // Sicherheitsnetz, falls ein Rückruf ausbleibt
   if (w.kind === 'sat') {
     if (isPlaying()) closePlayer();
-    openSat(nextCh.id);
+    openSat(nextCh.id, zapDone);
     return;
   }
   // Stream: Sat-Bild zu, dann Player (läuft er schon, nur umschalten)
@@ -375,10 +393,12 @@ function zap(step: number): void {
     hideTvWindow().then(() => {
       state.tuner.tvOpen = false;
       play(nextCh.id);
+      zapDone();
     });
     return;
   }
   if (!switchPlayerChannel(nextCh.id)) play(nextCh.id);
+  zapDone();
 }
 
 /** Tasten im Sat-Sichtmodus (TV-Bild vor der App). true = verarbeitet */
@@ -554,6 +574,7 @@ function openTvWindow(): void {
 function closeTvWindow(): void {
   hideTvWindow().then(() => {
     state.tuner.tvOpen = false;
+    zapCurrent = null;
     render();
     const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
     if (back) setFocus(back);
@@ -642,6 +663,7 @@ function canPlay(channelId: string): boolean {
 }
 
 function play(channelId: string): void {
+  zapCurrent = channelId;
   if (state.overlay) {
     // Dialog schliessen, ohne den Fokus zurückzusetzen; der Player merkt sich die Stelle
     $('overlay').hidden = true;
@@ -654,6 +676,7 @@ function play(channelId: string): void {
     playableChannels(),
     channelId,
     () => {
+      if (!state.tuner.tvOpen) zapCurrent = null;
       render();
       const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
       if (back) setFocus(back);
