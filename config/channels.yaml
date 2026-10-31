@@ -25,47 +25,14 @@ channels:
   - { id: 5plus,    name: "5+",         country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tv24,     name: "TV24",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tv25,     name: "TV25",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  # Regionalsender der CH Media: offizieller Livestream der Senderwebsite (DASH, ohne DRM), aus CH geprüft 31.10.2026
-  - id: telezueri
-    name: "TeleZüri"
-    country: CH
-    epg: null
-    app: direct
-    stream: { url: "https://oneplusstream-prod.akamaized.net/telezueri/manifest.mpd", type: dash, source: "https://www.telezueri.ch/live", checked: "2026-10-31" }
-    deeplink: null
-    verified: true
-  - id: telebaern
-    name: "TeleBärn"
-    country: CH
-    epg: null
-    app: direct
-    stream: { url: "https://oneplusstream-prod.akamaized.net/telebaern/manifest.mpd", type: dash, source: "https://www.telebaern.tv/live", checked: "2026-10-31" }
-    deeplink: null
-    verified: true
-  - id: telem1
-    name: "Tele M1"
-    country: CH
-    epg: null
-    app: direct
-    stream: { url: "https://oneplusstream-prod.akamaized.net/telem1/manifest.mpd", type: dash, source: "https://www.telem1.ch/live", checked: "2026-10-31" }
-    deeplink: null
-    verified: true
-  - id: tele1
-    name: "Tele 1"
-    country: CH
-    epg: null
-    app: direct
-    stream: { url: "https://oneplusstream-prod.akamaized.net/tele1/manifest.mpd", type: dash, source: "https://www.tele1.ch/live", checked: "2026-10-31" }
-    deeplink: null
-    verified: true
-  - id: tvo
-    name: "TVO"
-    country: CH
-    epg: null
-    app: direct
-    stream: { url: "https://oneplusstream-prod.akamaized.net/tvo/manifest.mpd", type: dash, source: "https://www.tvo-online.ch/live", checked: "2026-10-31" }
-    deeplink: null
-    verified: true
+  # Regionalsender der CH Media: Livestream (DASH) läuft nur von CH-Media-Websites aus – der CDN erlaubt keine fremden
+  # Ursprünge (CORS), am TV «Stream lässt sich nicht abspielen» (31.10.2026). Kein Proxy/Umweg → Joyn. Adressen zur Doku:
+  # https://oneplusstream-prod.akamaized.net/<telezueri|telebaern|telem1|tele1|tvo>/manifest.mpd
+  - { id: telezueri, name: "TeleZüri",   country: CH, epg: null, app: joyn, deeplink: null, verified: true }
+  - { id: telebaern, name: "TeleBärn",   country: CH, epg: null, app: joyn, deeplink: null, verified: true }
+  - { id: telem1,   name: "Tele M1",    country: CH, epg: null, app: joyn, deeplink: null, verified: true }
+  - { id: tele1,    name: "Tele 1",     country: CH, epg: null, app: joyn, deeplink: null, verified: true }
+  - { id: tvo,      name: "TVO",        country: CH, epg: null, app: joyn, deeplink: null, verified: true }
   # TeleBasel: offizieller Livestream der Senderwebsite (HLS bis 1080p), aus CH geprüft 31.10.2026
   - id: telebasel
     name: "TeleBasel"

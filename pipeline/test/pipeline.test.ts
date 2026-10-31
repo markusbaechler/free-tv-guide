@@ -17,11 +17,13 @@ test('Config lädt konsistent', () => {
   assert.equal(channels.find((c) => c.id === 'zdf')!.app, 'joyn');
   assert.equal(channels.find((c) => c.id === 'orf1')!.app, 'zattoo');
   // Direkte Livestreams: nur mit vollständiger Dokumentation (Adresse, Typ, Quelle, Prüfdatum)
-  const tz = channels.find((c) => c.id === 'telezueri')!;
-  assert.equal(tz.app, 'direct');
-  assert.equal(tz.stream!.type, 'dash');
-  assert.match(tz.stream!.source, /^https:\/\/www\.telezueri\.ch/);
-  assert.match(tz.stream!.checked, /^\d{4}-\d{2}-\d{2}$/);
+  const tb = channels.find((c) => c.id === 'telebasel')!;
+  assert.equal(tb.app, 'direct');
+  assert.equal(tb.stream!.type, 'hls');
+  assert.match(tb.stream!.source, /^https:\/\/telebasel\.ch/);
+  // CH-Media-Regionalsender: CDN sperrt fremde Ursprünge → Joyn
+  assert.equal(channels.find((c) => c.id === 'telezueri')!.app, 'joyn');
+  assert.match(tb.stream!.checked, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(channels.find((c) => c.id === 'zdf')!.stream, null);
   assert.doesNotThrow(() => loadRules(CONFIG, new Set(rights.keys())));
   // YAML-Anker in Listen werden flach gemacht
