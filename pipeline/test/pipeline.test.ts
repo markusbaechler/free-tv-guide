@@ -16,6 +16,13 @@ test('Config lädt konsistent', () => {
   assert.equal(channels.find((c) => c.id === 'srf2')!.app, 'srg');
   assert.equal(channels.find((c) => c.id === 'zdf')!.app, 'joyn');
   assert.equal(channels.find((c) => c.id === 'orf1')!.app, 'zattoo');
+  // Direkte Livestreams: nur mit vollständiger Dokumentation (Adresse, Typ, Quelle, Prüfdatum)
+  const tz = channels.find((c) => c.id === 'telezueri')!;
+  assert.equal(tz.app, 'direct');
+  assert.equal(tz.stream!.type, 'dash');
+  assert.match(tz.stream!.source, /^https:\/\/www\.telezueri\.ch/);
+  assert.match(tz.stream!.checked, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(channels.find((c) => c.id === 'zdf')!.stream, null);
   assert.doesNotThrow(() => loadRules(CONFIG, new Set(rights.keys())));
   // YAML-Anker in Listen werden flach gemacht
   assert.ok(rights.get('bundesliga')!.channels.includes('sat1'));

@@ -16,7 +16,9 @@ Eine Tizen-Web-App mit drei Bereichen:
 
 ## 2. Harte Grenzen (nicht verhandelbar)
 
-- Wiedergabe in der App **nur** für SRG-Sender (SRF, RTS, RSI) über die offizielle «SRGSSR Video»-API (Livestream-URN) und den offiziellen SRG-Player «Pillarbox», so wie es die SRG auf ihrem Entwicklerportal vorsieht. Keine anderen Streamquellen, keine Stream-URLs im Code oder in den Daten, kein Umgehen von DRM, Geoblocking oder Werbung, keine M3U-/IPTV-Listen.
+- Wiedergabe in der App für **SRG-Sender** (SRF, RTS, RSI) über die offizielle «SRGSSR Video»-API (Livestream-URN) und den offiziellen SRG-Player «Pillarbox», so wie es die SRG auf ihrem Entwicklerportal vorsieht.
+- **Erweiterung (Entscheid Nutzer 31.10.2026, privater Gebrauch):** Zusätzlich dürfen **offizielle Livestreams des jeweiligen Senders** in der App abgespielt werden (`app: direct`), wenn alle Bedingungen erfüllt sind: der Stream stammt von der Website des Senders selbst, ist dort gratis, ohne Login, ohne DRM und ohne Geoblocking für die Schweiz abrufbar; je Sender sind in `channels.yaml` Quelle (Live-Seite) und Prüfdatum dokumentiert; die App gibt den Stream unverändert wieder (Senderwerbung bleibt). Keine offizielle Freigabe der Sender für Dritt-Apps – Einordnung «privat vertretbar». Bei Ausfall meldet die App «Stream lässt sich nicht abspielen», Alternative Joyn/Zattoo.
+- Weiterhin ausgeschlossen: Fremd- oder Sammelquellen (M3U-/IPTV-Listen, Mirror, Proxys), Umgehen von DRM, Geoblocking (auch per VPN) oder Werbung, geoblockte Streams (ARD, ZDF, ORF, arte), Streams hinter Login oder Werbe-Zwangszustimmung (ServusTV On, oneplus/3+).
 - Nicht-SRG-Sender nur über offizielle Apps: **Joyn Schweiz** (Das Erste, ZDF, 3sat, RTL CH, VOX CH, ProSieben, Sat.1, kabel eins, RTL Zwei, 3+ …; gratis, kurze Werbespots vor dem Stream, kein Zeitlimit bekannt), sonst **Zattoo Free** (ORF, ServusTV, TV24, blue Zoom; Werbung, 10 h/Monat am TV). Zuordnung je Sender in `channels.yaml` (`app`).
 - Keine Pay-TV-Inhalte im Sport-Guide. Ein Event erscheint nur, wenn es laut `rights.yaml` frei empfangbar ist.
 - Ausschliesslich private, nicht-kommerzielle Nutzung, wie es die Nutzungsbedingungen der SRG SSR API verlangen.
@@ -74,7 +76,7 @@ Eine Tizen-Web-App mit drei Bereichen:
 
 - Event auf SRG-Sender, läuft oder beginnt in < 15 Min. → sofort Vollbild-Player.
 - Event später → Dialog «Beginnt um …» mit «<Sender> jetzt einschalten».
-- Sender-Kachel mit SRG-Livestream → sofort Player. Ohne → Dialog mit Joyn- bzw. Zattoo-Hinweis und Knopf «Joyn/Zattoo öffnen».
+- Sender-Kachel mit Livestream (SRG-URN oder `app: direct`) → sofort Player. Ohne → Dialog mit Joyn- bzw. Zattoo-Hinweis und Knopf «Joyn/Zattoo öffnen».
 - Im Player: Hoch/Runter bzw. CH+/CH− wechselt zwischen den SRG-Sendern, OK zeigt Info inkl. Bildgrösse (z. B. 1920×1080), Zurück führt in den Guide. Der Player startet mit hoher Bandbreitenschätzung (20 Mbit/s), sonst beginnt er am TV mit 640×360.
 - Start-Tab ist «Jetzt live». Der Status-Balken zeigt «Stand hh:mm» der Daten und die App-Version (aus `config.xml`).
 - Player-Code (Pillarbox + video.js, ~800 KB) liegt in `player.js` und wird erst beim ersten Abspielen geladen. `globalThis` wird für Chromium 63 per Banner nachgerüstet.
@@ -122,6 +124,11 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 | EPG Nicht-SRG-Sender | TV24, 3+, blue Zoom, ARD, ZDF, RTL usw. | **Keine Quelle mit klaren Nutzungsbedingungen gefunden** (Phase 1). Scraping von TV-Zeitschriften oder Zattoo bewusst ausgeschlossen. Tab «Sender» zeigt dort nur den Namen | Entscheid |
 | `manual_events.yaml` | Einzelne Events ohne EPG-Quelle | Manuell | Fallback |
 | SRGSSR Video API v2 (`/videometadata/v2/livestreams?bu=…`) | Livestream-URN je SRG-Sender (für Pillarbox) | Gleiche Zugangsdaten wie EPG | Fakt. Portal: Livestreams dürfen in eigenen Websites und Apps abgespielt werden, mit Pillarbox |
+| CH Media Regionalsender (telezueri.ch, telebaern.tv, telem1.ch, tele1.ch, tvo-online.ch, je `/live`) | Livestream TeleZüri, TeleBärn, Tele M1, Tele 1, TVO | Gratis, ohne Login, DASH ohne DRM, aus CH geprüft 31.10.2026 (Chrome des Nutzers). Websites haben nur Impressum/Datenschutz, keine Nutzungsbedingungen | Entscheid: `app: direct`, privater Gebrauch |
+| TeleBasel (telebasel.ch/livestream) | Livestream TeleBasel | Gratis, ohne Login, HLS bis 1080p, geprüft 31.10.2026 | Entscheid: `app: direct` |
+| 3sat-Mediathek (3sat.de/programm) | Livestream 3sat, DACH-Variante | Gratis, ohne Login, HLS ohne DRM, aus CH abrufbar (geprüft 31.10.2026). ZDF-Nutzungsbedingungen: privater Gebrauch; Adresse wie vom 3sat-Player geladen | Entscheid: `app: direct` |
+| tagesschau.de (Livestream «Internationales Angebot») | tagesschau24 ohne Sportnachrichten | Offiziell für das Ausland vorgesehen, HLS 720p, geprüft 31.10.2026 | Entscheid: `app: direct` |
+| Geprüft und **ausgeschlossen** (31.10.2026) | arte (Geoblocking DE/FR, arte-API: Land CH → 0 Streams), ServusTV On (Zwangszustimmung zu personalisierter Werbung oder Abo), ARD/ZDF-Hauptprogramme (Geoblocking DE), ORF (Geoblocking AT), TeleTop (Live-Seite nicht gefunden) | – | bleiben Joyn/Zattoo |
 
 ### 5.2 Secrets (nur in GitHub Secrets, nie im Code oder Chat)
 

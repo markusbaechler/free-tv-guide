@@ -1,7 +1,10 @@
 # Senderliste für den Tab «Sender».
 # epg:      "srg:<bu>:<station>" = Programmdaten aus der SRG SSR EPG API, null = keine EPG-Quelle
 # app:      wie der Sender abgespielt wird
-#           srg    = in der App selbst (offizieller SRG-Livestream, Pillarbox; nur SRF/RTS/RSI)
+#           srg    = in der App selbst (offizieller SRG-Livestream über die SRG-API, Pillarbox; nur SRF/RTS/RSI)
+#           direct = in der App selbst über den offiziellen, frei zugänglichen Livestream des Senders (ohne DRM, ohne Login,
+#                    ohne Geoblocking für CH), Adresse wie auf der Website des Senders. Pflichtfelder in stream:
+#                    url (Manifest), type (hls|dash), source (Live-Seite des Senders), checked (Datum der Prüfung aus CH)
 #           joyn   = Joyn-App (Joyn Schweiz: gratis, ohne bekanntes Zeitlimit, kurze Werbespots vor dem Stream)
 #           zattoo = Zattoo-App (Zattoo Free: Werbung beim Umschalten, 10 h/Monat am TV) – nur wenn es nichts anderes gibt
 # deeplink: Startparameter für die externe App (Joyn/Zattoo), wird als App-Control-Datum «PAYLOAD» übergeben;
@@ -22,18 +25,79 @@ channels:
   - { id: 5plus,    name: "5+",         country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tv24,     name: "TV24",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tv25,     name: "TV25",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: telezueri, name: "TeleZüri",  country: CH, epg: null, app: joyn, deeplink: null, verified: true }  # Deeplink-Versuche gescheitert (SPEC.md 4.5a); in Joyn CH gelistet
-  - { id: telebaern, name: "TeleBärn",  country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: telem1,   name: "Tele M1",    country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: tele1,    name: "Tele 1",     country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: tvo,      name: "TVO",        country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  # Übrige Regionalsender: nur Zattoo
-  - { id: telebasel, name: "TeleBasel", country: CH, epg: null, app: zattoo, deeplink: null, verified: false }
+  # Regionalsender der CH Media: offizieller Livestream der Senderwebsite (DASH, ohne DRM), aus CH geprüft 31.10.2026
+  - id: telezueri
+    name: "TeleZüri"
+    country: CH
+    epg: null
+    app: direct
+    stream: { url: "https://oneplusstream-prod.akamaized.net/telezueri/manifest.mpd", type: dash, source: "https://www.telezueri.ch/live", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  - id: telebaern
+    name: "TeleBärn"
+    country: CH
+    epg: null
+    app: direct
+    stream: { url: "https://oneplusstream-prod.akamaized.net/telebaern/manifest.mpd", type: dash, source: "https://www.telebaern.tv/live", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  - id: telem1
+    name: "Tele M1"
+    country: CH
+    epg: null
+    app: direct
+    stream: { url: "https://oneplusstream-prod.akamaized.net/telem1/manifest.mpd", type: dash, source: "https://www.telem1.ch/live", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  - id: tele1
+    name: "Tele 1"
+    country: CH
+    epg: null
+    app: direct
+    stream: { url: "https://oneplusstream-prod.akamaized.net/tele1/manifest.mpd", type: dash, source: "https://www.tele1.ch/live", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  - id: tvo
+    name: "TVO"
+    country: CH
+    epg: null
+    app: direct
+    stream: { url: "https://oneplusstream-prod.akamaized.net/tvo/manifest.mpd", type: dash, source: "https://www.tvo-online.ch/live", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  # TeleBasel: offizieller Livestream der Senderwebsite (HLS bis 1080p), aus CH geprüft 31.10.2026
+  - id: telebasel
+    name: "TeleBasel"
+    country: CH
+    epg: null
+    app: direct
+    stream: { url: "https://tb-simplex-cdn-live.akamaized.net/smsla-o-1080-720-360/ngrp:simplex-live-srt-49166.stream_all/playlist.m3u8", type: hls, source: "https://telebasel.ch/livestream", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  # TeleTop: Live-Seite nicht gefunden (tele-top.ch nicht erreichbar, toponline.ch/tele-top/live 404) → vorerst Zattoo
   - { id: teletop,  name: "TeleTop",    country: CH, epg: null, app: zattoo, deeplink: null, verified: false }
   - { id: bluezoom, name: "blue Zoom",  country: CH, epg: null, app: zattoo, deeplink: null, verified: false }
   - { id: daserste, name: "Das Erste",  country: DE, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: zdf,      name: "ZDF",        country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: 3sat,     name: "3sat",       country: DE, epg: null, app: joyn, deeplink: null, verified: false }
+  # 3sat: DACH-Livestream der 3sat-Mediathek (HLS, ohne DRM), aus CH geprüft 31.10.2026; Adresse wie vom 3sat-Player geladen
+  - id: 3sat
+    name: "3sat"
+    country: DE
+    epg: null
+    app: direct
+    stream: { url: "https://zdf-hls-18.akamaized.net/hls/live/2016501/dach/high/master.m3u8", type: hls, source: "https://www.3sat.de/programm", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
+  # tagesschau24: offizieller internationaler Livestream («ohne Geoblocking», ohne Sportnachrichten), HLS 720p, geprüft 31.10.2026
+  - id: tagesschau24
+    name: "tagesschau24"
+    country: DE
+    epg: null
+    app: direct
+    stream: { url: "https://tagesschau.akamaized.net/hls/live/2020115/tagesschau/tagesschau_1/master-720p-3328.m3u8", type: hls, source: "https://www.tagesschau.de/multimedia/livestreams/livestream1", checked: "2026-10-31" }
+    deeplink: null
+    verified: true
   - { id: rtl,      name: "RTL",        country: DE, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: sat1,     name: "Sat.1",      country: DE, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: prosieben, name: "ProSieben", country: DE, epg: null, app: joyn, deeplink: null, verified: false }

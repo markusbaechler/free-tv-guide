@@ -133,7 +133,7 @@ async function loadLivestreams(token: string | null, channels: Channel[]): Promi
   let previous: Record<string, string> = {};
   try {
     const prev = JSON.parse(readFileSync(join(OUT_DIR, 'channels.json'), 'utf8')) as { channels: Channel[] };
-    for (const c of prev.channels) if (c.live) previous[c.id] = c.live.urn;
+    for (const c of prev.channels) if (c.live && c.live.urn) previous[c.id] = c.live.urn;
   } catch {
     previous = {};
   }
@@ -156,7 +156,13 @@ async function loadLivestreams(token: string | null, channels: Channel[]): Promi
   }
   let ok = 0;
   for (const c of channels) {
-    const urn = byChannel[c.id] ?? previous[c.id];
+    if (c.app === 'direct' && c.stream) {
+      // Offizieller Livestream des Senders (Adresse aus channels.yaml, am TV geprüft)
+      c.live = { url: c.stream.url, type: c.stream.type };
+      ok++;
+      continue;
+    }
+    const urn = c.app === 'srg' ? (byChannel[c.id] ?? previous[c.id]) : undefined;
     c.live = urn ? { urn } : null;
     if (urn) ok++;
   }

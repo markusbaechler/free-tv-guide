@@ -211,7 +211,7 @@ function channelTile(c: Channel, now: Date): HTMLElement {
     h('div', { class: 'tile__name' }, c.name),
     nn.now
       ? h('div', { class: 'tile__now' }, h('span', { class: 'tile__title' }, nn.now.title), nn.now.end ? h('span', { class: 'tile__time' }, 'bis ' + time(nn.now.end)) : null)
-      : h('div', { class: 'tile__now tile__now--none' }, c.epg ? 'Kein Programm verfügbar' : c.app === 'joyn' ? 'Über die Joyn-App' : 'Über die Zattoo-App'),
+      : h('div', { class: 'tile__now tile__now--none' }, c.epg ? 'Kein Programm verfügbar' : c.app === 'direct' ? 'Livestream' : c.app === 'joyn' ? 'Über die Joyn-App' : 'Über die Zattoo-App'),
     nn.next ? h('div', { class: 'tile__next' }, time(nn.next.start) + '  ' + nn.next.title) : null,
   );
 }
@@ -321,21 +321,24 @@ function rememberFocus(): void {
 
 let pendingLaunch: { app: PlayerApp; deeplink: string | null } | null = null;
 
-/** Sender mit offiziellem SRG-Livestream, in Senderlisten-Reihenfolge (für Hoch/Runter im Player) */
+/** Sender, die die App selbst abspielt (SRG-URN oder offizieller Livestream), in Listen-Reihenfolge (Hoch/Runter im Player) */
 function playableChannels(): PlayableChannel[] {
   const now = new Date();
   const list = state.data ? state.data.channels : [];
   return list
-    .filter((c) => c.live && c.live.urn)
+    .filter((c) => isLive(c))
     .map((c) => {
       const nn = state.data ? nowNext(state.data.epg[c.id], now) : { now: null, next: null };
-      return { id: c.id, name: c.name, urn: c.live!.urn, nowTitle: nn.now ? nn.now.title : null };
+      return { id: c.id, name: c.name, src: c.live!, nowTitle: nn.now ? nn.now.title : null };
     });
 }
 
+function isLive(c: Channel | null): boolean {
+  return !!(c && c.live && (c.live.urn || c.live.url));
+}
+
 function canPlay(channelId: string): boolean {
-  const c = channelById(channelId);
-  return !!(c && c.live && c.live.urn);
+  return isLive(channelById(channelId));
 }
 
 function play(channelId: string): void {

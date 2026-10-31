@@ -2,8 +2,14 @@
 // Lädt player.js (Pillarbox) bei Bedarf nach.
 import { clear, h } from './dom.ts';
 
+export interface PlaySource {
+  urn?: string;
+  url?: string;
+  type?: 'hls' | 'dash';
+}
+
 interface PlayerHandle {
-  play(urn: string): void;
+  play(src: PlaySource): void;
   onError(cb: (message: string) => void): void;
   onPlaying(cb: () => void): void;
   quality(): string | null;
@@ -13,7 +19,7 @@ interface PlayerHandle {
 export interface PlayableChannel {
   id: string;
   name: string;
-  urn: string;
+  src: PlaySource;
   /** Laufende Sendung, für die Info-Leiste */
   nowTitle: string | null;
 }
@@ -86,7 +92,7 @@ function start(): void {
   const ch = channels[index];
   if (!ch || !handle) return;
   showInfo('Wird geladen …', true);
-  handle.play(ch.urn);
+  handle.play(ch.src);
 }
 
 /** Öffnet den Player für einen Sender; list = alle abspielbaren Sender (für Hoch/Runter) */
@@ -107,8 +113,14 @@ export function openPlayer(list: PlayableChannel[], channelId: string, closed: (
       const api = (window as unknown as { ftgPlayer: { create(id: string): PlayerHandle } }).ftgPlayer;
       handle = api.create('ftg-video');
       handle.onPlaying(() => showInfo(null, false));
-      // Häufigster Grund: Abruf nicht aus der Schweiz (SRG-Geoblocking, z. B. wegen VPN)
-      handle.onError((msg) => showInfo('Der Stream lässt sich nicht abspielen: ' + msg + ' SRG-Livestreams laufen nur aus der Schweiz.', true));
+      handle.onError((msg) => {
+        const ch = channels[index];
+        // SRG: häufigster Grund ist Abruf nicht aus der Schweiz (Geoblocking, z. B. VPN). Direkte Streams: Adresse geändert?
+        const hint = ch && ch.src.urn
+          ? ' SRG-Livestreams laufen nur aus der Schweiz.'
+          : ' Der Sender hat seinen Livestream vielleicht verschoben – Hoch/Runter wechselt den Sender.';
+        showInfo('Der Stream lässt sich nicht abspielen: ' + msg + hint, true);
+      });
       start();
     })
     .catch((e: Error) => showInfo(e.message + '. Mit Zurück zum Guide.', true));

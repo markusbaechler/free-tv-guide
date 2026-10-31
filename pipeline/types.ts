@@ -22,13 +22,27 @@ export interface Channel {
   name: string;
   country: 'CH' | 'DE' | 'AT';
   epg: string | null;
-  /** srg = in der App (Pillarbox), joyn/zattoo = externe App */
-  app: 'srg' | 'joyn' | 'zattoo';
+  /**
+   * srg    = in der App über SRG-API-URN (Pillarbox)
+   * direct = in der App über den offiziellen Livestream des Senders (Adresse aus channels.yaml)
+   * joyn/zattoo = externe App
+   */
+  app: 'srg' | 'joyn' | 'zattoo' | 'direct';
+  /** Nur app=direct: offizieller Livestream des Senders, wie auf seiner Website */
+  stream?: { url: string; type: 'hls' | 'dash'; source: string; checked: string } | null;
   /** Startparameter für die externe App (PAYLOAD), null = nur öffnen */
   deeplink: string | null;
   verified: boolean;
-  /** Offizieller SRG-Livestream (URN für den Pillarbox-Player), null = nicht in der App abspielbar */
-  live?: { urn: string } | null;
+  /** In der App abspielbar: SRG-URN oder direkte Stream-Adresse. null = nur externe App */
+  live?: LiveSource | null;
+}
+
+export interface LiveSource {
+  /** SRG: URN für Pillarbox */
+  urn?: string;
+  /** direct: Manifest-Adresse (HLS/DASH, ohne DRM) */
+  url?: string;
+  type?: 'hls' | 'dash';
 }
 
 export interface CompetitionRight {

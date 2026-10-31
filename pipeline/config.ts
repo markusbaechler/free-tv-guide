@@ -44,13 +44,23 @@ export function loadChannels(dir: string): Channel[] {
     seen.add(id);
     if (!['CH', 'DE', 'AT'].includes(c.country)) fail(file, `${id}: country ungültig`);
     if (c.epg != null && !/^srg:(srf|rts|rsi):[A-Za-z0-9_-]+$/.test(c.epg)) fail(file, `${id}: epg ungültig`);
-    if (!['srg', 'joyn', 'zattoo'].includes(c.app)) fail(file, `${id}: app muss srg, joyn oder zattoo sein`);
+    if (!['srg', 'joyn', 'zattoo', 'direct'].includes(c.app)) fail(file, `${id}: app muss srg, joyn, zattoo oder direct sein`);
+    let stream: Channel['stream'] = null;
+    if (c.app === 'direct') {
+      const s = c.stream ?? {};
+      if (!/^https:\/\/[^\s]+$/.test(String(s.url))) fail(file, `${id}: stream.url muss eine https-Adresse sein`);
+      if (!['hls', 'dash'].includes(s.type)) fail(file, `${id}: stream.type muss hls oder dash sein`);
+      if (!/^https:\/\//.test(String(s.source))) fail(file, `${id}: stream.source (Website des Senders) fehlt`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s.checked))) fail(file, `${id}: stream.checked (Prüfdatum) fehlt`);
+      stream = { url: String(s.url), type: s.type, source: String(s.source), checked: String(s.checked) };
+    } else if (c.stream) fail(file, `${id}: stream nur bei app: direct`);
     return {
       id,
       name: String(c.name),
       country: c.country,
       epg: c.epg ?? null,
       app: c.app,
+      stream,
       deeplink: c.deeplink == null ? null : String(c.deeplink),
       verified: c.verified === true,
     };

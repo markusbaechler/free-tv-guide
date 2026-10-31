@@ -5,12 +5,12 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 ## Kontext
 
 - Tizen-Web-App für Samsung QE75Q70R (2019, Tizen 5.0, Chromium ~M63). Nutzer in der Schweiz.
-- Die App bündelt legale Free-TV-Programminfos. SRG-Sender spielt sie selbst ab (Pillarbox), andere Sender nur über die Joyn- oder Zattoo-App (kein Deeplink möglich, Sender dort wählen).
+- Die App bündelt legale Free-TV-Programminfos. SRG-Sender spielt sie selbst ab (Pillarbox, SRG-API-URN); Sender mit offiziellem, frei zugänglichem Livestream (CH-Media-Regionalsender, TeleBasel, 3sat, tagesschau24) ebenfalls selbst (`app: direct`); übrige nur über die Joyn- oder Zattoo-App (kein Deeplink möglich, Sender dort wählen).
 - Entwicklungs-PC: Windows auf ARM (kein Tizen Studio). Installation auf dem TV über **Apps2Samsung** (Custom WGT / TPK), unsigniertes `.wgt` aus `app/dist` mit `zip -X -r`.
 
 ## Harte Regeln
 
-- Wiedergabe nur für SRG-Sender über SRG-API-URN + offiziellen Player Pillarbox. Keine anderen Streamquellen, keine Stream-URLs in Code/Daten, kein Umgehen von DRM, Geoblocking oder Werbung, keine M3U- oder IPTV-Quellen.
+- Wiedergabe: SRG-Sender über SRG-API-URN + Pillarbox. Andere Sender nur über ihren **eigenen offiziellen Livestream** (gratis, ohne Login, ohne DRM, ohne Geoblocking für CH), Adresse ausschliesslich in `config/channels.yaml` mit `source` (Live-Seite des Senders) und `checked` (Prüfdatum aus CH) – Entscheid Nutzer 31.10.2026, siehe SPEC.md §2 und §5.1. Keine Stream-Adressen im Code. Keine Fremd- oder Sammelquellen (M3U, IPTV, Mirror, Proxys), kein Umgehen von DRM, Geoblocking (auch kein VPN) oder Werbung.
 - Keine Senderlogos, nur Text.
 - Secrets (`SRG_CLIENT_ID`, `SRG_CLIENT_SECRET`, Zertifikats-Passwörter) nie committen, loggen oder ausgeben.
 - Neue Datenquellen nur nach Prüfung der Nutzungsbedingungen. Ergebnis in SPEC.md §5.1 dokumentieren.
