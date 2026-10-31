@@ -16,7 +16,7 @@ const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev
 type Tab = 'live' | 'sport' | 'channels';
 
 const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'live', label: 'Jetzt live' },
+  { id: 'live', label: 'Jetzt' },
   { id: 'sport', label: 'Sport' },
   { id: 'channels', label: 'Sender' },
 ];
@@ -318,7 +318,7 @@ function refreshTunerEpg(): void {
   const next = () => {
     const id = ids.shift();
     if (!id) return;
-    tunerEpg(t.matched[id]!, 6).then(
+    tunerEpg(t.matched[id]!, 12).then(
       (entries) => {
         t.epg[id] = { fetchedAt: Date.now(), entries };
         if (!isPlaying() && !state.overlay) render();
@@ -448,34 +448,97 @@ function satKey(code: number): boolean {
   return true;
 }
 
+/** Favoriten (Fallback: alle Sender), die die App selbst zeigen kann oder die Programmdaten haben */
+function nowChannels(): Channel[] {
+  const favIds = state.data ? state.data.favorites || [] : [];
+  const favs = favIds.map((id) => channelById(id)).filter((c): c is Channel => !!c);
+  return favs.length ? favs : orderedChannels();
+}
+
+/** Anteil der laufenden Sendung, 0–1 */
+function progress(e: EpgEntry, now: Date): number {
+  if (!e.end) return 0;
+  const a = new Date(e.start).getTime();
+  const b = new Date(e.end).getTime();
+  if (b <= a) return 0;
+  return Math.max(0, Math.min(1, (now.getTime() - a) / (b - a)));
+}
+
+/** Zeile «Jetzt»: Sender · laufende Sendung mit Fortschritt · danach */
+function programRow(c: Channel, now: Date): HTMLElement {
+  const nn = nowNext(epgFor(c), now);
+  const way = firstWay(c);
+  const wayText = way ? (way.kind === 'stream' ? 'Stream' : way.kind === 'sat' ? 'Sat' : PLAYERS[way.app].name) : '';
+  const cur = nn.now;
+  return h(
+    'div',
+    { class: 'prow' + (way && way.kind === 'ext' ? ' prow--ext' : ''), 'data-nav': true, 'data-key': 'ch:' + c.id },
+    h('div', { class: 'prow__chan' }, h('div', { class: 'prow__name' }, c.name), h('div', { class: 'prow__way' }, wayText)),
+    cur
+      ? h(
+          'div',
+          { class: 'prow__now' },
+          h('div', { class: 'prow__title' }, cur.title),
+          h('div', { class: 'prow__bar' }, h('i', { style: 'width:' + Math.round(progress(cur, now) * 100) + '%' })),
+          h('div', { class: 'prow__time' }, time(cur.start) + (cur.end ? ' – ' + time(cur.end) + ' · ' + remaining(cur.end, now) : '')),
+        )
+      : h('div', { class: 'prow__now' }, h('div', { class: 'prow__title prow__title--none' }, wayLabel(c))),
+    h('div', { class: 'prow__next' }, nn.next ? h('span', { class: 'prow__nextlabel' }, 'danach ' + time(nn.next.start)) : null, nn.next ? h('span', { class: 'prow__nexttitle' }, nn.next.title) : null),
+  );
+}
+
+/** Sendung eines Senders zu einem Zeitpunkt (läuft dann), sonst die erste danach */
+function programAt(c: Channel, at: Date): EpgEntry | null {
+  const list = epgFor(c);
+  if (!list) return null;
+  const iso = at.toISOString();
+  for (const e of list) if (e.start <= iso && (!e.end || e.end > iso)) return e;
+  for (const e of list) if (e.start > iso) return e;
+  return null;
+}
+
+/** Zeile «Heute 20:15» / «Später»: Sender · Sendung um … */
+function laterRow(c: Channel, e: EpgEntry): HTMLElement {
+  return h(
+    'div',
+    { class: 'prow prow--later', 'data-nav': true, 'data-key': 'later:' + c.id + ':' + e.start },
+    h('div', { class: 'prow__chan' }, h('div', { class: 'prow__name' }, c.name)),
+    h('div', { class: 'prow__now' }, h('div', { class: 'prow__title' }, e.title), e.subtitle ? h('div', { class: 'prow__time' }, e.subtitle) : null),
+    h('div', { class: 'prow__next' }, h('span', { class: 'prow__nextlabel' }, time(e.start) + (e.end ? ' – ' + time(e.end) : ''))),
+  );
+}
+
+function primeTime(now: Date): Date {
+  const d = new Date(now.getTime());
+  d.setHours(20, 15, 0, 0);
+  return d;
+}
+
 function renderLive(main: HTMLElement, now: Date): void {
   const box = h('div', { class: 'live-view', 'data-scroll': true, 'data-nav-group': 'live' });
-  const all = groups().filter((g) => g.kind === 'live');
-  const running = all.filter((g) => isRunning(g, now));
-  const soon = all.filter((g) => !isRunning(g, now) && g.start > now.toISOString() && dayKey(g.start) === dayKey(now)).slice(0, 4);
-
-  box.appendChild(h('h2', { class: 'section-head' }, 'Sport läuft jetzt'));
-  if (running.length) running.forEach((g, i) => box.appendChild(eventRow(g, now, i === 0)));
-  else box.appendChild(h('p', { class: 'note' }, 'Gerade läuft kein Live-Sport im Free-TV.'));
-
-  if (soon.length) {
-    box.appendChild(h('h2', { class: 'section-head' }, 'Heute noch'));
-    soon.forEach((g, i) => {
-      const row = eventRow(g, now, !running.length && i === 0);
-      const when = row.querySelector('.row__when');
-      if (when) when.textContent = startsIn(g.start, now);
-      box.appendChild(row);
-    });
+  const running = groups().filter((g) => g.kind === 'live' && isRunning(g, now));
+  if (running.length) {
+    box.appendChild(h('h2', { class: 'section-head' }, 'Sport läuft jetzt'));
+    running.slice(0, 3).forEach((g, i) => box.appendChild(eventRow(g, now, i === 0)));
   }
 
-  // Favoriten mit Programmdaten (SRG-API oder Sat-Signal)
-  const withEpg = orderedChannels().filter((c) => {
-    const e = epgFor(c);
-    return !!e && e.length > 0;
-  });
-  if (withEpg.length) {
-    box.appendChild(h('h2', { class: 'section-head' }, 'Jetzt im Programm'));
-    box.appendChild(h('div', { class: 'tiles' }, withEpg.map((c) => channelTile(c, now))));
+  const chans = nowChannels();
+  box.appendChild(h('h2', { class: 'section-head' }, 'Jetzt auf deinen Sendern'));
+  if (!chans.length) box.appendChild(h('p', { class: 'note' }, 'Keine Sender geladen.'));
+  for (const c of chans) box.appendChild(programRow(c, now));
+
+  // Primetime: vor 20:15 «Heute 20:15», danach «Später heute» (ab in 2 Stunden)
+  const pt = primeTime(now);
+  const beforePrime = now.getTime() < pt.getTime() - 10 * 60 * 1000;
+  const at = beforePrime ? pt : new Date(now.getTime() + 2 * 3600 * 1000);
+  const rows: HTMLElement[] = [];
+  for (const c of chans) {
+    const e = programAt(c, at);
+    if (e && e.start > now.toISOString() && dayKey(e.start) === dayKey(now)) rows.push(laterRow(c, e));
+  }
+  if (rows.length) {
+    box.appendChild(h('h2', { class: 'section-head' }, beforePrime ? 'Heute 20:15' : 'Später heute'));
+    rows.forEach((r) => box.appendChild(r));
   }
   main.appendChild(box);
 }
@@ -756,7 +819,7 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   const now = new Date();
   const first = firstWay(ch);
   const playable = !!first && first.kind !== 'ext';
-  const lines0: string[] = note ? [note] : [];
+  const lines0: string[] = note && g ? [note] : [];
   const lines: HTMLElement[] = [];
   if (g && g.start > now.toISOString()) {
     const day = dayKey(g.start) === dayKey(now) ? 'heute' : dayLabel(dayKey(g.start), now);
@@ -764,7 +827,7 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   } else if (g) {
     lines.push(h('p', null, 'Läuft auf ' + name + ', ' + remaining(g.end, now) + '.'));
   } else {
-    lines.push(h('p', null, name + ' ansehen.'));
+    lines.push(h('p', null, note || name + ' ansehen.'));
   }
   if (g && g.others.length) {
     lines.push(h('p', { class: 'dialog__muted' }, 'Auch auf ' + g.others.map((o) => channelName(o.channel)).join(', ') + '.'));
@@ -879,6 +942,15 @@ function activate(el: HTMLElement): void {
     return openWatch(g.primary.channel, displayTitle(g.primary), g, null);
   }
   if (kind === 'ch') return watch(value, null, null);
+  if (kind === 'later') {
+    const sep = value.indexOf(':');
+    const id = value.slice(0, sep);
+    const start = value.slice(sep + 1);
+    const c = channelById(id);
+    const e = c ? (epgFor(c) || []).filter((x) => x.start === start)[0] : undefined;
+    const ch = c ? c.name : id;
+    return openWatch(id, e ? e.title : null, null, 'Beginnt um ' + time(start) + ' auf ' + ch + '.');
+  }
   if (kind === 'play') return watch(value, null, null);
   if (key === 'launch:ext' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
   if (key === 'close') return closeOverlay();
