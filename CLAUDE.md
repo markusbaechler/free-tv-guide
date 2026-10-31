@@ -5,7 +5,7 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 ## Kontext
 
 - Tizen-Web-App für Samsung QE75Q70R (2019, Tizen 5.0, Chromium ~M63). Nutzer in der Schweiz.
-- Die App bündelt legale Free-TV-Programminfos. SRG-Sender spielt sie selbst ab (Pillarbox), andere Sender nur über die Zattoo-App.
+- Die App bündelt legale Free-TV-Programminfos. SRG-Sender spielt sie selbst ab (Pillarbox), andere Sender nur über die Joyn- oder Zattoo-App (kein Deeplink möglich, Sender dort wählen).
 - Entwicklungs-PC: Windows auf ARM (kein Tizen Studio). Installation auf dem TV über **Apps2Samsung** (Custom WGT / TPK), unsigniertes `.wgt` aus `app/dist` mit `zip -X -r`.
 
 ## Harte Regeln
