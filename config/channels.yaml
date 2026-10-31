@@ -21,20 +21,20 @@ channels:
   - { id: rts2,     name: "RTS 2",      country: CH, epg: "srg:rts:rts-2", app: srg, deeplink: null, verified: false }
   - { id: rsila1,   name: "RSI LA 1",   country: CH, epg: "srg:rsi:la-1", app: srg, deeplink: null, verified: false }
   - { id: rsila2,   name: "RSI LA 2",   country: CH, epg: "srg:rsi:la-2", app: srg, deeplink: null, verified: false }
-  # CH-Media-Sender: laut Joyn Schweiz enthalten (3+ bestätigt, übrige unverifiziert)
-  - { id: 3plus,    name: "3+",         country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: 4plus,    name: "4+",         country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: 5plus,    name: "5+",         country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: tv24,     name: "TV24",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: tv25,     name: "TV25",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
+  # CH-Media-Sender: zuerst Sat-Tuner probieren (Schweizer Sender sind gescannt; ob frei empfangbar, zeigt der Test), sonst Joyn
+  - { id: 3plus, name: "3+", country: CH, epg: null, app: sat, sat: { names: ["3+ HD", "3+"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: 4plus, name: "4+", country: CH, epg: null, app: sat, sat: { names: ["4+ HD", "4+"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: 5plus, name: "5+", country: CH, epg: null, app: sat, sat: { names: ["5+ HD", "5+"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: tv24, name: "TV24", country: CH, epg: null, app: sat, sat: { names: ["TV24 HD", "TV24"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: tv25, name: "TV25", country: CH, epg: null, app: sat, sat: { names: ["TV25 HD", "TV25"] }, fallback: joyn, deeplink: null, verified: false }
   # Regionalsender der CH Media: Livestream (DASH) läuft nur von CH-Media-Websites aus – der CDN erlaubt keine fremden
   # Ursprünge (CORS), am TV «Stream lässt sich nicht abspielen» (31.10.2026). Kein Proxy/Umweg → Joyn. Adressen zur Doku:
   # https://oneplusstream-prod.akamaized.net/<telezueri|telebaern|telem1|tele1|tvo>/manifest.mpd
-  - { id: telezueri, name: "TeleZüri",   country: CH, epg: null, app: joyn, deeplink: null, verified: true }
-  - { id: telebaern, name: "TeleBärn",   country: CH, epg: null, app: joyn, deeplink: null, verified: true }
-  - { id: telem1,   name: "Tele M1",    country: CH, epg: null, app: joyn, deeplink: null, verified: true }
-  - { id: tele1,    name: "Tele 1",     country: CH, epg: null, app: joyn, deeplink: null, verified: true }
-  - { id: tvo,      name: "TVO",        country: CH, epg: null, app: joyn, deeplink: null, verified: true }
+  - { id: telezueri, name: "TeleZüri", country: CH, epg: null, app: sat, sat: { names: ["TeleZüri HD", "TeleZueri HD", "TeleZüri", "TeleZueri", "Tele Züri"] }, fallback: joyn, deeplink: null, verified: true }
+  - { id: telebaern, name: "TeleBärn", country: CH, epg: null, app: sat, sat: { names: ["TeleBärn HD", "TeleBaern HD", "TeleBärn", "TeleBaern", "Tele Bärn"] }, fallback: joyn, deeplink: null, verified: true }
+  - { id: telem1, name: "Tele M1", country: CH, epg: null, app: sat, sat: { names: ["Tele M1 HD", "TeleM1 HD", "Tele M1", "TeleM1"] }, fallback: joyn, deeplink: null, verified: true }
+  - { id: tele1, name: "Tele 1", country: CH, epg: null, app: sat, sat: { names: ["Tele 1 HD", "Tele1 HD", "Tele 1", "Tele1"] }, fallback: joyn, deeplink: null, verified: true }
+  - { id: tvo, name: "TVO", country: CH, epg: null, app: sat, sat: { names: ["TVO HD", "TVO"] }, fallback: joyn, deeplink: null, verified: true }
   # TeleBasel: offizieller Livestream der Senderwebsite (HLS bis 1080p), aus CH geprüft 31.10.2026
   - id: telebasel
     name: "TeleBasel"

@@ -23,8 +23,9 @@ test('Config lädt konsistent', () => {
   assert.equal(tb.app, 'direct');
   assert.equal(tb.stream!.type, 'hls');
   assert.match(tb.stream!.source, /^https:\/\/telebasel\.ch/);
-  // CH-Media-Regionalsender: CDN sperrt fremde Ursprünge → Joyn
-  assert.equal(channels.find((c) => c.id === 'telezueri')!.app, 'joyn');
+  // CH-Media-Regionalsender: Internet-Stream nur von CH-Media-Seiten (CORS) → Sat-Versuch mit Fallback Joyn
+  assert.equal(channels.find((c) => c.id === 'telezueri')!.app, 'sat');
+  assert.equal(channels.find((c) => c.id === 'telezueri')!.fallback, 'joyn');
   assert.match(tb.stream!.checked, /^\d{4}-\d{2}-\d{2}$/);
   assert.equal(channels.find((c) => c.id === 'zdf')!.stream, null);
   assert.doesNotThrow(() => loadRules(CONFIG, new Set(rights.keys())));
