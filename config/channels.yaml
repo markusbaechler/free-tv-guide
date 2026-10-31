@@ -5,6 +5,8 @@
 #           direct = in der App selbst über den offiziellen, frei zugänglichen Livestream des Senders (ohne DRM, ohne Login,
 #                    ohne Geoblocking für CH), Adresse wie auf der Website des Senders. Pflichtfelder in stream:
 #                    url (Manifest), type (hls|dash), source (Live-Seite des Senders), checked (Datum der Prüfung aus CH)
+#           sat    = Sat-/DVB-Tuner des Fernsehers (Astra 19.2°E, unverschlüsselt). sat.names = Sendernamen in der Tuner-Liste,
+#                    bevorzugte zuerst (HD vor SD); fallback = App, wenn der Sender im Tuner fehlt
 #           joyn   = Joyn-App (Joyn Schweiz: gratis, ohne bekanntes Zeitlimit, kurze Werbespots vor dem Stream)
 #           zattoo = Zattoo-App (Zattoo Free: Werbung beim Umschalten, 10 h/Monat am TV) – nur wenn es nichts anderes gibt
 # deeplink: Startparameter für die externe App (Joyn/Zattoo), wird als App-Control-Datum «PAYLOAD» übergeben;
@@ -45,8 +47,15 @@ channels:
   # TeleTop: Live-Seite nicht gefunden (tele-top.ch nicht erreichbar, toponline.ch/tele-top/live 404) → vorerst Zattoo
   - { id: teletop,  name: "TeleTop",    country: CH, epg: null, app: zattoo, deeplink: null, verified: false }
   - { id: bluezoom, name: "blue Zoom",  country: CH, epg: null, app: zattoo, deeplink: null, verified: false }
-  - { id: daserste, name: "Das Erste",  country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: zdf,      name: "ZDF",        country: DE, epg: null, app: joyn, deeplink: null, verified: false }
+  # Deutsche Sender über Sat (Astra 19.2°E, frei empfangbar; Private nur in SD, HD = HD+-Abo). Fallback Joyn.
+  - { id: daserste, name: "Das Erste",  country: DE, epg: null, app: sat, sat: { names: ["Das Erste HD", "Das Erste"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: zdf,      name: "ZDF",        country: DE, epg: null, app: sat, sat: { names: ["ZDF HD", "ZDF"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: arte,     name: "arte",       country: DE, epg: null, app: sat, sat: { names: ["arte HD", "ARTE HD", "arte", "ARTE"] }, fallback: null, deeplink: null, verified: false }
+  - { id: phoenix,  name: "Phoenix",    country: DE, epg: null, app: sat, sat: { names: ["phoenix HD", "PHOENIX HD", "phoenix", "PHOENIX"] }, fallback: null, deeplink: null, verified: false }
+  - { id: zdfneo,   name: "ZDFneo",     country: DE, epg: null, app: sat, sat: { names: ["ZDFneo HD", "zdf_neo HD", "ZDFneo", "zdf_neo"] }, fallback: null, deeplink: null, verified: false }
+  - { id: zdfinfo,  name: "ZDFinfo",    country: DE, epg: null, app: sat, sat: { names: ["ZDFinfo HD", "zdf_info HD", "ZDFinfo", "zdf_info"] }, fallback: null, deeplink: null, verified: false }
+  - { id: one,      name: "ONE",        country: DE, epg: null, app: sat, sat: { names: ["ONE HD", "ONE"] }, fallback: null, deeplink: null, verified: false }
+  - { id: kika,     name: "KiKA",       country: DE, epg: null, app: sat, sat: { names: ["KiKA HD", "KiKA"] }, fallback: null, deeplink: null, verified: false }
   # 3sat: DACH-Livestream der 3sat-Mediathek (HLS, ohne DRM), aus CH geprüft 31.10.2026; Adresse wie vom 3sat-Player geladen
   - id: 3sat
     name: "3sat"
@@ -65,12 +74,13 @@ channels:
     stream: { url: "https://tagesschau.akamaized.net/hls/live/2020115/tagesschau/tagesschau_1/master-720p-3328.m3u8", type: hls, source: "https://www.tagesschau.de/multimedia/livestreams/livestream1", checked: "2026-10-31" }
     deeplink: null
     verified: true
-  - { id: rtl,      name: "RTL",        country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: sat1,     name: "Sat.1",      country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: prosieben, name: "ProSieben", country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: vox,      name: "VOX",        country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: kabeleins, name: "kabel eins", country: DE, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: rtlzwei,  name: "RTL Zwei",   country: DE, epg: null, app: joyn, deeplink: null, verified: false }
+  - { id: rtl,      name: "RTL",        country: DE, epg: null, app: sat, sat: { names: ["RTL Television", "RTL"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: sat1,     name: "Sat.1",      country: DE, epg: null, app: sat, sat: { names: ["SAT.1", "Sat.1"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: prosieben, name: "ProSieben", country: DE, epg: null, app: sat, sat: { names: ["ProSieben", "PRO7"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: vox,      name: "VOX",        country: DE, epg: null, app: sat, sat: { names: ["VOX"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: kabeleins, name: "kabel eins", country: DE, epg: null, app: sat, sat: { names: ["kabel eins", "Kabel 1", "KABEL EINS"] }, fallback: joyn, deeplink: null, verified: false }
+  - { id: rtlzwei,  name: "RTL Zwei",   country: DE, epg: null, app: sat, sat: { names: ["RTLZWEI", "RTL ZWEI", "RTL2", "RTL II"] }, fallback: joyn, deeplink: null, verified: false }
+  # Österreich: ORF auf Sat verschlüsselt → Zattoo. ServusTV Österreich: auf Sat frei (unverifiziert), sonst Zattoo
   - { id: orf1,     name: "ORF 1",      country: AT, epg: null, app: zattoo, deeplink: null, verified: false }
   - { id: orf2,     name: "ORF 2",      country: AT, epg: null, app: zattoo, deeplink: null, verified: false }
-  - { id: servustv, name: "ServusTV",   country: AT, epg: null, app: zattoo, deeplink: null, verified: false }
+  - { id: servustv, name: "ServusTV",   country: AT, epg: null, app: sat, sat: { names: ["ServusTV HD Oesterreich", "ServusTV HD Österreich", "ServusTV HD", "ServusTV Oesterreich", "ServusTV"] }, fallback: zattoo, deeplink: null, verified: false }

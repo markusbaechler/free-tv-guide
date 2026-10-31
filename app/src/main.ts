@@ -1,5 +1,5 @@
 import type { Channel, GuideEvent, Sport } from '../../pipeline/types.ts';
-import { loadData, nowNext, type GuideData } from './data.ts';
+import { loadData, nowNext, type EpgEntry, type GuideData } from './data.ts';
 import { clear, h } from './dom.ts';
 import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './focus.ts';
 import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
@@ -7,7 +7,7 @@ import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, typ
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
 import { isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
-import { hideTvWindow, listChannels, programNow, showTvWindow, tuneTo, tunerAvailable, videoSources, type TunerChannel } from './tuner.ts';
+import { hideTvWindow, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
 declare const __APP_VERSION__: string;
@@ -29,8 +29,17 @@ const state = {
   data: null as GuideData | null,
   loading: true,
   overlay: null as null | 'watch' | 'exit',
-  /** Sat-Tuner-Probe */
-  tuner: { channels: [] as TunerChannel[], log: [] as string[], tvOpen: false },
+  /** Sat-Tuner: Diagnose, Zuordnung Sender-ID → Tuner-Sender, Programm aus dem Sendesignal, Sichtmodus */
+  tuner: {
+    channels: [] as TunerChannel[],
+    log: [] as string[],
+    tvOpen: false,
+    loaded: false,
+    error: null as string | null,
+    matched: {} as Record<string, TunerChannel>,
+    epg: {} as Record<string, { fetchedAt: number; entries: TunerEpgEntry[] }>,
+    current: null as string | null,
+  },
 };
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -206,17 +215,133 @@ function renderSport(main: HTMLElement, now: Date): void {
 
 // ---------------------------------------------------------------- Tab «Jetzt live»
 
+/** Programm eines Senders: aus den Pipeline-Daten (SRG) oder aus dem Sat-Signal (Tuner) */
+function epgFor(c: Channel): EpgEntry[] | undefined {
+  if (state.data && state.data.epg[c.id]) return state.data.epg[c.id];
+  const t = state.tuner.epg[c.id];
+  return t ? t.entries : undefined;
+}
+
+function satLabel(c: Channel): string {
+  const t = state.tuner;
+  const m = t.matched[c.id];
+  if (m) return 'Sat' + (m.major !== null ? ' · Kanal ' + m.major : '');
+  if (!isTizen()) return 'Sat (nur am Fernseher)';
+  if (!t.loaded) return t.error ? 'Sat-Tuner: ' + t.error : 'Sat-Tuner wird gelesen …';
+  return c.fallback ? 'Nicht im Sat-Tuner · über ' + PLAYERS[c.fallback].name : 'Nicht im Sat-Tuner';
+}
+
 function channelTile(c: Channel, now: Date): HTMLElement {
-  const nn = state.data ? nowNext(state.data.epg[c.id], now) : { now: null, next: null };
+  const nn = nowNext(epgFor(c), now);
+  const none = c.app === 'sat' ? satLabel(c) : c.epg ? 'Kein Programm verfügbar' : c.app === 'direct' ? 'Livestream' : c.app === 'joyn' ? 'Über die Joyn-App' : 'Über die Zattoo-App';
   return h(
     'div',
     { class: 'tile', 'data-nav': true, 'data-key': 'ch:' + c.id },
     h('div', { class: 'tile__name' }, c.name),
     nn.now
       ? h('div', { class: 'tile__now' }, h('span', { class: 'tile__title' }, nn.now.title), nn.now.end ? h('span', { class: 'tile__time' }, 'bis ' + time(nn.now.end)) : null)
-      : h('div', { class: 'tile__now tile__now--none' }, c.epg ? 'Kein Programm verfügbar' : c.app === 'direct' ? 'Livestream' : c.app === 'joyn' ? 'Über die Joyn-App' : 'Über die Zattoo-App'),
+      : h('div', { class: 'tile__now tile__now--none' }, none),
     nn.next ? h('div', { class: 'tile__next' }, time(nn.next.start) + '  ' + nn.next.title) : null,
   );
+}
+
+// ---------------------------------------------------------------- Sat-Tuner: Zuordnung, Programm, Sichtmodus
+
+const TUNER_EPG_MAX_AGE_MS = 10 * 60 * 1000;
+
+/** Tuner-Liste lesen, Sat-Sender zuordnen, Programm nachladen (nur am Fernseher) */
+function ensureTuner(): void {
+  const t = state.tuner;
+  if (!isTizen() || !state.data || !tunerAvailable().channel) return;
+  const sats = state.data.channels.filter((c) => c.app === 'sat' && c.sat);
+  if (!sats.length) return;
+  loadTunerList().then(
+    (list) => {
+      t.channels = list;
+      t.loaded = true;
+      t.error = null;
+      for (const c of sats) {
+        const m = matchTunerChannel(list, c.sat!.names);
+        if (m) t.matched[c.id] = m;
+      }
+      render();
+      refreshTunerEpg();
+    },
+    (e: Error) => {
+      t.loaded = true;
+      t.error = e.message;
+      render();
+    },
+  );
+}
+
+/** Programmdaten der zugeordneten Sat-Sender nacheinander laden (schonend für den Tuner) */
+function refreshTunerEpg(): void {
+  const t = state.tuner;
+  const ids = Object.keys(t.matched).filter((id) => !t.epg[id] || Date.now() - t.epg[id]!.fetchedAt > TUNER_EPG_MAX_AGE_MS);
+  const next = () => {
+    const id = ids.shift();
+    if (!id) return;
+    tunerEpg(t.matched[id]!, 6).then(
+      (entries) => {
+        t.epg[id] = { fetchedAt: Date.now(), entries };
+        if (!isPlaying() && !state.overlay) render();
+        next();
+      },
+      () => {
+        t.epg[id] = { fetchedAt: Date.now(), entries: [] };
+        next();
+      },
+    );
+  };
+  next();
+}
+
+/** Zuordnete Sat-Sender in Listenreihenfolge (für Hoch/Runter im Sichtmodus) */
+function satChannels(): Channel[] {
+  const list = state.data ? state.data.channels : [];
+  return list.filter((c) => c.app === 'sat' && state.tuner.matched[c.id]);
+}
+
+function openSat(channelId: string): void {
+  const m = state.tuner.matched[channelId];
+  if (!m) return;
+  if (state.overlay) closeOverlay();
+  else rememberFocus();
+  tuneTo(m).then(
+    (r) => {
+      state.tuner.current = channelId;
+      if (r !== 'ok') tunerLog('Tune ' + m.name + ': ' + r);
+      if (!state.tuner.tvOpen) openTvWindow();
+    },
+    (e: Error) => tunerLog('Fehler ' + e.message),
+  );
+}
+
+function satStep(step: number): void {
+  const list = satChannels();
+  if (!list.length) return;
+  const i = list.map((c) => c.id).indexOf(state.tuner.current || '');
+  const nextCh = list[(i + step + list.length) % list.length]!;
+  openSat(nextCh.id);
+}
+
+/** Tasten im Sat-Sichtmodus (TV-Bild vor der App). true = verarbeitet */
+function satKey(code: number): boolean {
+  if (!state.tuner.tvOpen) return false;
+  if (code === 10009 || code === 8 || code === 27) {
+    closeTvWindow();
+    return true;
+  }
+  if (code === 38 || code === 427) {
+    satStep(-1);
+    return true;
+  }
+  if (code === 40 || code === 428) {
+    satStep(1);
+    return true;
+  }
+  return true;
 }
 
 function renderLive(main: HTMLElement, now: Date): void {
@@ -267,13 +392,13 @@ function renderChannels(main: HTMLElement, now: Date): void {
 
 function tunerLog(line: string): void {
   state.tuner.log = [line].concat(state.tuner.log).slice(0, 6);
-  render();
+  if (!state.tuner.tvOpen) render();
 }
 
 function renderTunerProbe(box: HTMLElement): void {
   const t = state.tuner;
   const avail = tunerAvailable();
-  box.appendChild(h('h2', { class: 'section-head' }, 'Sat-Tuner (Test)'));
+  box.appendChild(h('h2', { class: 'section-head' }, 'Tuner-Diagnose'));
   box.appendChild(
     h('p', { class: 'note' }, 'APIs: tvchannel ' + (avail.channel ? 'ja' : 'nein') + ' · tvwindow ' + (avail.window ? 'ja' : 'nein') + (t.channels.length ? ' · ' + t.channels.length + ' Sender gelesen' : '')),
   );
@@ -352,7 +477,9 @@ function openTvWindow(): void {
 function closeTvWindow(): void {
   hideTvWindow().then(() => {
     state.tuner.tvOpen = false;
-    tunerLog('TV-Bild geschlossen');
+    render();
+    const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
+    if (back) setFocus(back);
   });
 }
 
@@ -477,9 +604,10 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   if (g && g.others.length) {
     lines.push(h('p', { class: 'dialog__muted' }, 'Auch auf ' + g.others.map((o) => channelName(o.channel)).join(', ') + '.'));
   }
-  // Nicht-SRG-Sender: Joyn (bevorzugt) oder Zattoo Free
-  const ext: 'joyn' | 'zattoo' = ch && ch.app === 'joyn' ? 'joyn' : 'zattoo';
+  // Nicht abspielbare Sender: Joyn (bevorzugt) oder Zattoo Free; Sat-Sender ohne Tuner-Treffer über ihren Fallback
+  const ext: 'joyn' | 'zattoo' = ch && (ch.app === 'joyn' || (ch.app === 'sat' && ch.fallback === 'joyn')) ? 'joyn' : 'zattoo';
   if (!playable) {
+    if (ch && ch.app === 'sat') lines.push(h('p', { class: 'dialog__muted' }, satLabel(ch) + '.'));
     lines.push(h('p', { class: 'dialog__hint' }, PLAYER_NOTE[ext] + ' Dort ' + name + ' wählen.'));
   }
   pendingLaunch = { app: PLAYERS[ext], deeplink: ch ? ch.deeplink : null };
@@ -576,9 +704,13 @@ function activate(el: HTMLElement): void {
     if (!g) return;
     // Läuft oder beginnt gleich und SRG-Sender → sofort abspielen, sonst Dialog
     if (canPlay(g.primary.channel) && startsSoon(g, new Date())) return play(g.primary.channel);
+    if (state.tuner.matched[g.primary.channel] && startsSoon(g, new Date())) return openSat(g.primary.channel);
     return openWatch(g.primary.channel, displayTitle(g.primary), g);
   }
-  if (kind === 'ch') return canPlay(value) ? play(value) : openWatch(value, null, null);
+  if (kind === 'ch') {
+    if (state.tuner.matched[value]) return openSat(value);
+    return canPlay(value) ? play(value) : openWatch(value, null, null);
+  }
   if (kind === 'play') return play(value);
   if (key === 'launch:ext' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
   if (key === 'close') return closeOverlay();
@@ -609,6 +741,10 @@ const KEY = { left: 37, up: 38, right: 39, down: 40, enter: 13, back: 10009, bac
 
 function onKey(e: KeyboardEvent): void {
   const code = e.keyCode;
+  if (satKey(code)) {
+    e.preventDefault();
+    return;
+  }
   if (playerKey(code)) {
     e.preventDefault();
     return;
@@ -649,9 +785,10 @@ function refresh(): void {
   loadData().then((d) => {
     state.loading = false;
     if (d) state.data = d;
-    if (state.overlay || isPlaying()) return renderStatus();
+    if (state.overlay || isPlaying() || state.tuner.tvOpen) return renderStatus();
     render();
     if (firstLoad && state.data) defaultFocus();
+    ensureTuner();
   });
 }
 
@@ -676,10 +813,13 @@ function start(): void {
   refresh();
   setInterval(refresh, REFRESH_DATA_MS);
   setInterval(() => {
-    if (isPlaying()) return;
+    if (isPlaying() || state.tuner.tvOpen) return;
     if (!state.overlay) render();
     else renderStatus();
   }, REFRESH_VIEW_MS);
+  setInterval(() => {
+    if (state.tuner.loaded && !state.tuner.tvOpen) refreshTunerEpg();
+  }, TUNER_EPG_MAX_AGE_MS);
 }
 
 start();

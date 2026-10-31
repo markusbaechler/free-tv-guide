@@ -44,7 +44,15 @@ export function loadChannels(dir: string): Channel[] {
     seen.add(id);
     if (!['CH', 'DE', 'AT'].includes(c.country)) fail(file, `${id}: country ungültig`);
     if (c.epg != null && !/^srg:(srf|rts|rsi):[A-Za-z0-9_-]+$/.test(c.epg)) fail(file, `${id}: epg ungültig`);
-    if (!['srg', 'joyn', 'zattoo', 'direct'].includes(c.app)) fail(file, `${id}: app muss srg, joyn, zattoo oder direct sein`);
+    if (!['srg', 'joyn', 'zattoo', 'direct', 'sat'].includes(c.app)) fail(file, `${id}: app muss srg, joyn, zattoo, direct oder sat sein`);
+    let sat: Channel['sat'] = null;
+    let fallback: Channel['fallback'] = null;
+    if (c.app === 'sat') {
+      if (!Array.isArray(c.sat?.names) || !c.sat.names.length) fail(file, `${id}: sat.names (Sendernamen im Tuner) fehlt`);
+      sat = { names: c.sat.names.map(String) };
+      if (c.fallback != null && !['joyn', 'zattoo'].includes(c.fallback)) fail(file, `${id}: fallback muss joyn oder zattoo sein`);
+      fallback = c.fallback ?? null;
+    } else if (c.sat || c.fallback) fail(file, `${id}: sat/fallback nur bei app: sat`);
     let stream: Channel['stream'] = null;
     if (c.app === 'direct') {
       const s = c.stream ?? {};
@@ -61,6 +69,8 @@ export function loadChannels(dir: string): Channel[] {
       epg: c.epg ?? null,
       app: c.app,
       stream,
+      sat,
+      fallback,
       deeplink: c.deeplink == null ? null : String(c.deeplink),
       verified: c.verified === true,
     };

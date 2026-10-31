@@ -25,9 +25,14 @@ export interface Channel {
   /**
    * srg    = in der App über SRG-API-URN (Pillarbox)
    * direct = in der App über den offiziellen Livestream des Senders (Adresse aus channels.yaml)
+   * sat    = Sat-/DVB-Tuner des Fernsehers (tizen.tvchannel), Zuordnung über Sendernamen der Tuner-Liste
    * joyn/zattoo = externe App
    */
-  app: 'srg' | 'joyn' | 'zattoo' | 'direct';
+  app: 'srg' | 'joyn' | 'zattoo' | 'direct' | 'sat';
+  /** Nur app=sat: Namen in der Tuner-Senderliste, bevorzugte zuerst (HD vor SD) */
+  sat?: { names: string[] } | null;
+  /** Nur app=sat: externe App, falls der Sender im Tuner fehlt */
+  fallback?: 'joyn' | 'zattoo' | null;
   /** Nur app=direct: offizieller Livestream des Senders, wie auf seiner Website */
   stream?: { url: string; type: 'hls' | 'dash'; source: string; checked: string } | null;
   /** Startparameter für die externe App (PAYLOAD), null = nur öffnen */

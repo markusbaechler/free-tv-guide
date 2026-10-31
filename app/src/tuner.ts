@@ -156,3 +156,87 @@ export function videoSources(): Promise<string> {
     }
   });
 }
+
+// ---------------------------------------------------------------- Zuordnung und Programmdaten
+
+export interface TunerEpgEntry {
+  title: string;
+  subtitle: string | null;
+  start: string;
+  end: string | null;
+}
+
+let cachedList: TunerChannel[] | null = null;
+let listPromise: Promise<TunerChannel[]> | null = null;
+
+/** Senderliste einmal lesen und behalten */
+export function loadTunerList(): Promise<TunerChannel[]> {
+  if (cachedList) return Promise.resolve(cachedList);
+  if (listPromise) return listPromise;
+  listPromise = listChannels().then(
+    (l) => {
+      cachedList = l;
+      return l;
+    },
+    (e) => {
+      listPromise = null;
+      throw e;
+    },
+  );
+  return listPromise;
+}
+
+const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** Erster Name aus `names`, der in der Tuner-Liste vorkommt (HD zuerst, wenn so gelistet) */
+export function matchTunerChannel(list: TunerChannel[], names: string[]): TunerChannel | null {
+  for (const n of names) {
+    const want = norm(n);
+    for (const c of list) if (norm(c.name) === want) return c;
+  }
+  // Fallback: Name als Präfix (z. B. «Das Erste HD» ↔ «Das Erste»)
+  for (const n of names) {
+    const want = norm(n);
+    for (const c of list) if (norm(c.name).indexOf(want) === 0) return c;
+  }
+  return null;
+}
+
+function toIso(v: unknown): string | null {
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v.toISOString();
+  if (typeof v === 'string' || typeof v === 'number') {
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  return null;
+}
+
+/** Programm aus dem Sendesignal (DVB-EPG) für die nächsten Stunden, in der Form der App-EPG-Einträge */
+export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry[]> {
+  const t = tz();
+  if (!t || !t.tvchannel) return Promise.reject(new Error('tizen.tvchannel nicht vorhanden'));
+  return new Promise((resolve, reject) => {
+    try {
+      t.tvchannel!.getProgramList(
+        ch.raw,
+        new Date(),
+        (list) => {
+          const out: TunerEpgEntry[] = [];
+          for (const p of list) {
+            const start = toIso(p.startTime);
+            if (!start) continue;
+            const dur = typeof p.duration === 'number' ? p.duration : Number(p.duration);
+            const end = dur > 0 ? new Date(new Date(start).getTime() + dur * 1000).toISOString() : toIso(p.endTime);
+            out.push({ title: str(p.title) || 'Ohne Titel', subtitle: str(p.detailedDescription).slice(0, 120) || null, start, end });
+          }
+          out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+          resolve(out);
+        },
+        (e) => reject(new Error('getProgramList: ' + e.message)),
+        hours * 3600,
+      );
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}

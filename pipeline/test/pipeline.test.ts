@@ -14,7 +14,9 @@ test('Config lädt konsistent', () => {
   assert.ok(channels.length >= 20);
   // SRG-Sender spielt die App selbst ab, ARD/ZDF/Private über Joyn
   assert.equal(channels.find((c) => c.id === 'srf2')!.app, 'srg');
-  assert.equal(channels.find((c) => c.id === 'zdf')!.app, 'joyn');
+  assert.equal(channels.find((c) => c.id === 'zdf')!.app, 'sat');
+  assert.deepEqual(channels.find((c) => c.id === 'zdf')!.sat, { names: ['ZDF HD', 'ZDF'] });
+  assert.equal(channels.find((c) => c.id === 'zdf')!.fallback, 'joyn');
   assert.equal(channels.find((c) => c.id === 'orf1')!.app, 'zattoo');
   // Direkte Livestreams: nur mit vollständiger Dokumentation (Adresse, Typ, Quelle, Prüfdatum)
   const tb = channels.find((c) => c.id === 'telebasel')!;
