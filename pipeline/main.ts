@@ -156,15 +156,18 @@ async function loadLivestreams(token: string | null, channels: Channel[]): Promi
   }
   let ok = 0;
   for (const c of channels) {
-    if (c.app === 'direct' && c.stream) {
-      // Offizieller Livestream des Senders (Adresse aus channels.yaml, am TV geprüft)
-      c.live = { url: c.stream.url, type: c.stream.type };
-      ok++;
-      continue;
+    // Erster Weg, den die App selbst abspielen kann: SRG-URN oder offizieller Livestream des Senders
+    c.live = null;
+    for (const s of c.sources) {
+      if (s.kind === 'srg') {
+        const urn = byChannel[c.id] ?? previous[c.id];
+        if (urn) c.live = { urn };
+      } else if (s.kind === 'direct') {
+        c.live = { url: s.url, type: s.type };
+      }
+      if (c.live) break;
     }
-    const urn = c.app === 'srg' ? (byChannel[c.id] ?? previous[c.id]) : undefined;
-    c.live = urn ? { urn } : null;
-    if (urn) ok++;
+    if (c.live) ok++;
   }
   writeJson('debug/livestreams.json', found.map((l) => ({ ...l, channel: matchChannel(l.title) })));
   return { ok, failed };

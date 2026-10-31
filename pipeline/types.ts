@@ -23,24 +23,26 @@ export interface Channel {
   country: 'CH' | 'DE' | 'AT';
   epg: string | null;
   /**
+   * Empfangswege in Prioritätsreihenfolge; die App nimmt den ersten, der funktioniert:
    * srg    = in der App über SRG-API-URN (Pillarbox)
    * direct = in der App über den offiziellen Livestream des Senders (Adresse aus channels.yaml)
    * sat    = Sat-/DVB-Tuner des Fernsehers (tizen.tvchannel), Zuordnung über Sendernamen der Tuner-Liste
    * joyn/zattoo = externe App
    */
-  app: 'srg' | 'joyn' | 'zattoo' | 'direct' | 'sat';
-  /** Nur app=sat: Namen in der Tuner-Senderliste, bevorzugte zuerst (HD vor SD) */
-  sat?: { names: string[] } | null;
-  /** Nur app=sat: externe App, falls der Sender im Tuner fehlt */
-  fallback?: 'joyn' | 'zattoo' | null;
-  /** Nur app=direct: offizieller Livestream des Senders, wie auf seiner Website */
-  stream?: { url: string; type: 'hls' | 'dash'; source: string; checked: string } | null;
+  sources: ChannelSource[];
   /** Startparameter für die externe App (PAYLOAD), null = nur öffnen */
   deeplink: string | null;
   verified: boolean;
-  /** In der App abspielbar: SRG-URN oder direkte Stream-Adresse. null = nur externe App */
+  /** In der App abspielbar (erster srg-/direct-Weg): SRG-URN oder direkte Stream-Adresse. null = keiner */
   live?: LiveSource | null;
 }
+
+export type ChannelSource =
+  | { kind: 'srg' }
+  | { kind: 'direct'; url: string; type: 'hls' | 'dash'; source: string; checked: string }
+  | { kind: 'sat'; names: string[] }
+  | { kind: 'joyn' }
+  | { kind: 'zattoo' };
 
 export interface LiveSource {
   /** SRG: URN für Pillarbox */

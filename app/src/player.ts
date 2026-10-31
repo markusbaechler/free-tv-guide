@@ -31,6 +31,8 @@ let index = 0;
 let infoTimer: number | null = null;
 let qualityTimer: number | null = null;
 let onClose: (() => void) | null = null;
+/** Wird bei einem Wiedergabefehler gefragt; true = der Aufrufer übernimmt (anderer Empfangsweg), Player schliesst */
+let onFail: ((channelId: string) => boolean) | null = null;
 
 function loadPlayerBundle(): Promise<void> {
   if (loading) return loading;
@@ -96,10 +98,11 @@ function start(): void {
 }
 
 /** Öffnet den Player für einen Sender; list = alle abspielbaren Sender (für Hoch/Runter) */
-export function openPlayer(list: PlayableChannel[], channelId: string, closed: () => void): void {
+export function openPlayer(list: PlayableChannel[], channelId: string, closed: () => void, failover?: (channelId: string) => boolean): void {
   channels = list;
   index = Math.max(0, list.map((c) => c.id).indexOf(channelId));
   onClose = closed;
+  onFail = failover || null;
   const el = root();
   clear(el);
   el.appendChild(h('video-js', { id: 'ftg-video', class: 'pillarbox-js' }));
@@ -115,6 +118,7 @@ export function openPlayer(list: PlayableChannel[], channelId: string, closed: (
       handle.onPlaying(() => showInfo(null, false));
       handle.onError((msg) => {
         const ch = channels[index];
+        if (ch && onFail && onFail(ch.id)) return;
         // SRG: häufigster Grund ist Abruf nicht aus der Schweiz (Geoblocking, z. B. VPN). Direkte Streams: Adresse geändert?
         const hint = ch && ch.src.urn
           ? ' SRG-Livestreams laufen nur aus der Schweiz.'

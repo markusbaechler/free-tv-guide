@@ -5,7 +5,7 @@ import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './f
 import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
-import { isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
+import { closePlayer, isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
 import { hideTvWindow, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
@@ -222,18 +222,53 @@ function epgFor(c: Channel): EpgEntry[] | undefined {
   return t ? t.entries : undefined;
 }
 
-function satLabel(c: Channel): string {
+// ---------------------------------------------------------------- Empfangswege (Priorität aus channels.yaml)
+
+type Way = { kind: 'stream' } | { kind: 'sat'; tuner: TunerChannel } | { kind: 'ext'; app: 'joyn' | 'zattoo' };
+
+/** Quellen defensiv lesen (ältere Daten ohne `sources`) */
+const sourcesOf = (c: Channel) => c.sources || [];
+const hasSource = (c: Channel, kind: string) => sourcesOf(c).some((s) => s.kind === kind);
+
+/** Verfügbare Wege in Prioritätsreihenfolge: Direktstream/SRG → Sat (nur wenn im Tuner gefunden) → externe App */
+function ways(c: Channel): Way[] {
+  const out: Way[] = [];
+  let streamAdded = false;
+  for (const s of sourcesOf(c)) {
+    if (s.kind === 'srg' || s.kind === 'direct') {
+      const live = c.live;
+      const ok = live && ((s.kind === 'srg' && live.urn) || (s.kind === 'direct' && live.url === s.url));
+      if (ok && !streamAdded) {
+        out.push({ kind: 'stream' });
+        streamAdded = true;
+      }
+    } else if (s.kind === 'sat') {
+      const m = state.tuner.matched[c.id];
+      if (m) out.push({ kind: 'sat', tuner: m });
+    } else {
+      out.push({ kind: 'ext', app: s.kind });
+    }
+  }
+  return out;
+}
+
+const firstWay = (c: Channel | null): Way | null => (c ? ways(c)[0] || null : null);
+
+function wayLabel(c: Channel): string {
+  const w = firstWay(c);
   const t = state.tuner;
-  const m = t.matched[c.id];
-  if (m) return 'Sat' + (m.major !== null ? ' · Kanal ' + m.major : '');
-  if (!isTizen()) return 'Sat (nur am Fernseher)';
-  if (!t.loaded) return t.error ? 'Sat-Tuner: ' + t.error : 'Sat-Tuner wird gelesen …';
-  return c.fallback ? 'Nicht im Sat-Tuner · über ' + PLAYERS[c.fallback].name : 'Nicht im Sat-Tuner';
+  const satPending = hasSource(c, 'sat') && isTizen() && !t.loaded && !t.error;
+  if (w && w.kind === 'stream') return c.epg ? 'Kein Programm verfügbar' : 'Livestream';
+  if (w && w.kind === 'sat') return 'Sat' + (w.tuner.major !== null ? ' · Kanal ' + w.tuner.major : '');
+  if (satPending) return 'Sat-Tuner wird gelesen …';
+  const missing = hasSource(c, 'sat') && (isTizen() ? 'Nicht im Sat-Tuner' : 'Sat nur am Fernseher');
+  if (w && w.kind === 'ext') return (missing ? missing + ' · ' : '') + 'über ' + PLAYERS[w.app].name;
+  return missing || 'Kein Empfangsweg';
 }
 
 function channelTile(c: Channel, now: Date): HTMLElement {
   const nn = nowNext(epgFor(c), now);
-  const none = c.app === 'sat' ? satLabel(c) : c.epg ? 'Kein Programm verfügbar' : c.app === 'direct' ? 'Livestream' : c.app === 'joyn' ? 'Über die Joyn-App' : 'Über die Zattoo-App';
+  const none = wayLabel(c);
   return h(
     'div',
     { class: 'tile', 'data-nav': true, 'data-key': 'ch:' + c.id },
@@ -253,7 +288,7 @@ const TUNER_EPG_MAX_AGE_MS = 10 * 60 * 1000;
 function ensureTuner(): void {
   const t = state.tuner;
   if (!isTizen() || !state.data || !tunerAvailable().channel) return;
-  const sats = state.data.channels.filter((c) => c.app === 'sat' && c.sat);
+  const sats = state.data.channels.filter((c) => hasSource(c, 'sat'));
   if (!sats.length) return;
   loadTunerList().then(
     (list) => {
@@ -261,7 +296,8 @@ function ensureTuner(): void {
       t.loaded = true;
       t.error = null;
       for (const c of sats) {
-        const m = matchTunerChannel(list, c.sat!.names);
+        const names = ([] as string[]).concat(...sourcesOf(c).map((s) => (s.kind === 'sat' ? s.names : [])));
+        const m = matchTunerChannel(list, names);
         if (m) t.matched[c.id] = m;
       }
       render();
@@ -300,7 +336,10 @@ function refreshTunerEpg(): void {
 /** Zuordnete Sat-Sender in Listenreihenfolge (für Hoch/Runter im Sichtmodus) */
 function satChannels(): Channel[] {
   const list = state.data ? state.data.channels : [];
-  return list.filter((c) => c.app === 'sat' && state.tuner.matched[c.id]);
+  return list.filter((c) => {
+    const w = firstWay(c);
+    return !!w && w.kind === 'sat';
+  });
 }
 
 function openSat(channelId: string): void {
@@ -574,11 +613,38 @@ function play(channelId: string): void {
   } else {
     rememberFocus();
   }
-  openPlayer(playableChannels(), channelId, () => {
-    render();
-    const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
-    if (back) setFocus(back);
-  });
+  openPlayer(
+    playableChannels(),
+    channelId,
+    () => {
+      render();
+      const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
+      if (back) setFocus(back);
+    },
+    streamFailover,
+  );
+}
+
+/** Stream des Senders spielt nicht → nächster Weg (Sat oder externe App). true = übernommen */
+function streamFailover(channelId: string): boolean {
+  const c = channelById(channelId);
+  if (!c) return false;
+  const rest = ways(c).filter((w) => w.kind !== 'stream');
+  const next = rest[0];
+  if (!next) return false;
+  closePlayer();
+  if (next.kind === 'sat') openSat(channelId);
+  else openWatch(channelId, null, null, 'Der Livestream ist nicht erreichbar.');
+  return true;
+}
+
+/** Sender ansehen: erster verfügbarer Weg */
+function watch(channelId: string, title: string | null, g: EventGroup | null): void {
+  const c = channelById(channelId);
+  const w = firstWay(c);
+  if (w && w.kind === 'stream') return play(channelId);
+  if (w && w.kind === 'sat') return openSat(channelId);
+  openWatch(channelId, title, g, null);
 }
 
 /** Startet in weniger als 15 Minuten oder läuft schon → direkt abspielen */
@@ -586,12 +652,14 @@ function startsSoon(g: EventGroup, now: Date): boolean {
   return new Date(g.start).getTime() - now.getTime() < 15 * 60 * 1000;
 }
 
-function openWatch(channelId: string, title: string | null, g: EventGroup | null): void {
+function openWatch(channelId: string, title: string | null, g: EventGroup | null, note: string | null): void {
   rememberFocus();
   const ch = channelById(channelId);
   const name = ch ? ch.name : channelId;
   const now = new Date();
-  const playable = canPlay(channelId);
+  const first = firstWay(ch);
+  const playable = !!first && first.kind !== 'ext';
+  const lines0: string[] = note ? [note] : [];
   const lines: HTMLElement[] = [];
   if (g && g.start > now.toISOString()) {
     const day = dayKey(g.start) === dayKey(now) ? 'heute' : dayLabel(dayKey(g.start), now);
@@ -604,11 +672,15 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   if (g && g.others.length) {
     lines.push(h('p', { class: 'dialog__muted' }, 'Auch auf ' + g.others.map((o) => channelName(o.channel)).join(', ') + '.'));
   }
-  // Nicht abspielbare Sender: Joyn (bevorzugt) oder Zattoo Free; Sat-Sender ohne Tuner-Treffer über ihren Fallback
-  const ext: 'joyn' | 'zattoo' = ch && (ch.app === 'joyn' || (ch.app === 'sat' && ch.fallback === 'joyn')) ? 'joyn' : 'zattoo';
+  // Externe App laut Prioritätsliste (erste joyn/zattoo-Quelle), sonst Zattoo
+  const extWay = ch ? ways(ch).filter((w) => w.kind === 'ext')[0] : undefined;
+  const ext: 'joyn' | 'zattoo' = extWay && extWay.kind === 'ext' ? extWay.app : 'zattoo';
+  const hasExt = !!extWay;
   if (!playable) {
-    if (ch && ch.app === 'sat') lines.push(h('p', { class: 'dialog__muted' }, satLabel(ch) + '.'));
-    lines.push(h('p', { class: 'dialog__hint' }, PLAYER_NOTE[ext] + ' Dort ' + name + ' wählen.'));
+    for (const l of lines0) lines.push(h('p', { class: 'dialog__muted' }, l));
+    if (ch && hasSource(ch, 'sat') && isTizen()) lines.push(h('p', { class: 'dialog__muted' }, wayLabel(ch) + '.'));
+    if (hasExt) lines.push(h('p', { class: 'dialog__hint' }, PLAYER_NOTE[ext] + ' Dort ' + name + ' wählen.'));
+    else lines.push(h('p', { class: 'dialog__hint' }, 'Zurzeit kein Empfangsweg für ' + name + '.'));
   }
   pendingLaunch = { app: PLAYERS[ext], deeplink: ch ? ch.deeplink : null };
 
@@ -625,7 +697,9 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
         { class: 'dialog__actions' },
         playable
           ? h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'play:' + channelId }, name + ' jetzt einschalten')
-          : h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'launch:ext' }, PLAYERS[ext].name + ' öffnen'),
+          : hasExt
+            ? h('button', { class: 'btn btn--primary', type: 'button', 'data-nav': true, 'data-key': 'launch:ext' }, PLAYERS[ext].name + ' öffnen')
+            : null,
         h('button', { class: 'btn', type: 'button', 'data-nav': true, 'data-key': 'close' }, 'Abbrechen'),
       ),
     ),
@@ -703,15 +777,12 @@ function activate(el: HTMLElement): void {
     const g = groups().filter((x) => x.key === value)[0];
     if (!g) return;
     // Läuft oder beginnt gleich und SRG-Sender → sofort abspielen, sonst Dialog
-    if (canPlay(g.primary.channel) && startsSoon(g, new Date())) return play(g.primary.channel);
-    if (state.tuner.matched[g.primary.channel] && startsSoon(g, new Date())) return openSat(g.primary.channel);
-    return openWatch(g.primary.channel, displayTitle(g.primary), g);
+    const fw = firstWay(channelById(g.primary.channel));
+    if (fw && fw.kind !== 'ext' && startsSoon(g, new Date())) return watch(g.primary.channel, displayTitle(g.primary), g);
+    return openWatch(g.primary.channel, displayTitle(g.primary), g, null);
   }
-  if (kind === 'ch') {
-    if (state.tuner.matched[value]) return openSat(value);
-    return canPlay(value) ? play(value) : openWatch(value, null, null);
-  }
-  if (kind === 'play') return play(value);
+  if (kind === 'ch') return watch(value, null, null);
+  if (kind === 'play') return watch(value, null, null);
   if (key === 'launch:ext' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
   if (key === 'close') return closeOverlay();
   if (key === 'exit') {

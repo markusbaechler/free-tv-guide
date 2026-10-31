@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
-import type { Channel, CompetitionRight, ManualEvent, Rules, Sport } from './types.ts';
+import type { Channel, ChannelSource, CompetitionRight, ManualEvent, Rules, Sport } from './types.ts';
 
 const SPORTS: Sport[] = ['football', 'icehockey', 'motorsport'];
 
@@ -44,33 +44,35 @@ export function loadChannels(dir: string): Channel[] {
     seen.add(id);
     if (!['CH', 'DE', 'AT'].includes(c.country)) fail(file, `${id}: country ungültig`);
     if (c.epg != null && !/^srg:(srf|rts|rsi):[A-Za-z0-9_-]+$/.test(c.epg)) fail(file, `${id}: epg ungültig`);
-    if (!['srg', 'joyn', 'zattoo', 'direct', 'sat'].includes(c.app)) fail(file, `${id}: app muss srg, joyn, zattoo, direct oder sat sein`);
-    let sat: Channel['sat'] = null;
-    let fallback: Channel['fallback'] = null;
-    if (c.app === 'sat') {
-      if (!Array.isArray(c.sat?.names) || !c.sat.names.length) fail(file, `${id}: sat.names (Sendernamen im Tuner) fehlt`);
-      sat = { names: c.sat.names.map(String) };
-      if (c.fallback != null && !['joyn', 'zattoo'].includes(c.fallback)) fail(file, `${id}: fallback muss joyn oder zattoo sein`);
-      fallback = c.fallback ?? null;
-    } else if (c.sat || c.fallback) fail(file, `${id}: sat/fallback nur bei app: sat`);
-    let stream: Channel['stream'] = null;
-    if (c.app === 'direct') {
-      const s = c.stream ?? {};
-      if (!/^https:\/\/[^\s]+$/.test(String(s.url))) fail(file, `${id}: stream.url muss eine https-Adresse sein`);
-      if (!['hls', 'dash'].includes(s.type)) fail(file, `${id}: stream.type muss hls oder dash sein`);
-      if (!/^https:\/\//.test(String(s.source))) fail(file, `${id}: stream.source (Website des Senders) fehlt`);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s.checked))) fail(file, `${id}: stream.checked (Prüfdatum) fehlt`);
-      stream = { url: String(s.url), type: s.type, source: String(s.source), checked: String(s.checked) };
-    } else if (c.stream) fail(file, `${id}: stream nur bei app: direct`);
+    if (!Array.isArray(c.sources) || !c.sources.length) fail(file, `${id}: sources (Empfangswege in Prioritätsreihenfolge) fehlt`);
+    const sources: ChannelSource[] = c.sources.map((raw: any, i: number): ChannelSource => {
+      const src = typeof raw === 'string' ? { kind: raw } : raw ?? {};
+      const where = `${id}: sources[${i}]`;
+      switch (src.kind) {
+        case 'srg':
+        case 'joyn':
+        case 'zattoo':
+          return { kind: src.kind };
+        case 'direct':
+          if (!/^https:\/\/[^\s]+$/.test(String(src.url))) fail(file, `${where}: url muss eine https-Adresse sein`);
+          if (!['hls', 'dash'].includes(src.type)) fail(file, `${where}: type muss hls oder dash sein`);
+          if (!/^https:\/\//.test(String(src.source))) fail(file, `${where}: source (Live-Seite des Senders) fehlt`);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(String(src.checked))) fail(file, `${where}: checked (Prüfdatum) fehlt`);
+          return { kind: 'direct', url: String(src.url), type: src.type, source: String(src.source), checked: String(src.checked) };
+        case 'sat':
+          if (!Array.isArray(src.names) || !src.names.length) fail(file, `${where}: names (Sendernamen im Tuner) fehlt`);
+          return { kind: 'sat', names: src.names.map(String) };
+        default:
+          return fail(file, `${where}: kind muss srg, direct, sat, joyn oder zattoo sein`);
+      }
+    });
+    if (sources.filter((x) => x.kind === 'srg').length > 1) fail(file, `${id}: srg höchstens einmal`);
     return {
       id,
       name: String(c.name),
       country: c.country,
       epg: c.epg ?? null,
-      app: c.app,
-      stream,
-      sat,
-      fallback,
+      sources,
       deeplink: c.deeplink == null ? null : String(c.deeplink),
       verified: c.verified === true,
     };

@@ -12,22 +12,21 @@ const rights = loadRights(CONFIG, new Set(channels.map((c) => c.id)));
 
 test('Config lädt konsistent', () => {
   assert.ok(channels.length >= 20);
-  // SRG-Sender spielt die App selbst ab, ARD/ZDF/Private über Joyn
-  assert.equal(channels.find((c) => c.id === 'srf2')!.app, 'srg');
-  assert.equal(channels.find((c) => c.id === 'zdf')!.app, 'sat');
-  assert.deepEqual(channels.find((c) => c.id === 'zdf')!.sat, { names: ['ZDF HD', 'ZDF'] });
-  assert.equal(channels.find((c) => c.id === 'zdf')!.fallback, 'joyn');
-  assert.equal(channels.find((c) => c.id === 'orf1')!.app, 'zattoo');
+  // Empfangswege in Prioritätsreihenfolge: Direktstream → Sat → App
+  const kinds = (id: string) => channels.find((c) => c.id === id)!.sources.map((s) => s.kind);
+  assert.deepEqual(kinds('srf2'), ['srg', 'sat']);
+  assert.deepEqual(kinds('zdf'), ['sat', 'joyn']);
+  assert.deepEqual(kinds('orf1'), ['sat', 'zattoo']);
+  assert.deepEqual(kinds('telezueri'), ['direct', 'sat', 'joyn']);
   // Direkte Livestreams: nur mit vollständiger Dokumentation (Adresse, Typ, Quelle, Prüfdatum)
-  const tb = channels.find((c) => c.id === 'telebasel')!;
-  assert.equal(tb.app, 'direct');
-  assert.equal(tb.stream!.type, 'hls');
-  assert.match(tb.stream!.source, /^https:\/\/telebasel\.ch/);
-  // CH-Media-Regionalsender: Internet-Stream nur von CH-Media-Seiten (CORS) → Sat-Versuch mit Fallback Joyn
-  assert.equal(channels.find((c) => c.id === 'telezueri')!.app, 'sat');
-  assert.equal(channels.find((c) => c.id === 'telezueri')!.fallback, 'joyn');
-  assert.match(tb.stream!.checked, /^\d{4}-\d{2}-\d{2}$/);
-  assert.equal(channels.find((c) => c.id === 'zdf')!.stream, null);
+  const tb = channels.find((c) => c.id === 'telebasel')!.sources[0]!;
+  assert.equal(tb.kind, 'direct');
+  if (tb.kind === 'direct') {
+    assert.equal(tb.type, 'hls');
+    assert.match(tb.source, /^https:\/\/telebasel\.ch/);
+    assert.match(tb.checked, /^\d{4}-\d{2}-\d{2}$/);
+  }
+  assert.deepEqual(channels.find((c) => c.id === 'zdf')!.sources[0], { kind: 'sat', names: ['ZDF HD', 'ZDF'] });
   assert.doesNotThrow(() => loadRules(CONFIG, new Set(rights.keys())));
   // YAML-Anker in Listen werden flach gemacht
   assert.ok(rights.get('bundesliga')!.channels.includes('sat1'));
