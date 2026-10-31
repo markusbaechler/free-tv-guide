@@ -7,6 +7,8 @@ interface PlayerHandle {
   play(urn: string): void;
   onError(cb: (message: string) => void): void;
   onPlaying(cb: () => void): void;
+  /** Aktuelle Bildgrösse des Streams, z. B. «1280×720», null solange unbekannt */
+  quality(): string | null;
   dispose(): void;
 }
 
@@ -32,6 +34,11 @@ function create(elementId: string): PlayerHandle {
     },
     onPlaying(cb) {
       player.on('playing', cb);
+    },
+    quality() {
+      const w = Number(player.videoWidth && player.videoWidth()) || 0;
+      const ht = Number(player.videoHeight && player.videoHeight()) || 0;
+      return w && ht ? w + '×' + ht : null;
     },
     dispose() {
       player.dispose();

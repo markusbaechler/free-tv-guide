@@ -24,7 +24,8 @@ export interface Channel {
   epg: string | null;
   /** srg = in der App (Pillarbox), joyn/zattoo = externe App */
   app: 'srg' | 'joyn' | 'zattoo';
-  zattoo: { slot: number | null; deeplink: string | null };
+  /** Startparameter für die externe App (PAYLOAD), null = nur öffnen */
+  deeplink: string | null;
   verified: boolean;
   /** Offizieller SRG-Livestream (URN für den Pillarbox-Player), null = nicht in der App abspielbar */
   live?: { urn: string } | null;

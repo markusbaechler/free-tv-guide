@@ -47,20 +47,26 @@ export function exitApp(): boolean {
 }
 
 /**
- * Startet eine andere App. deeplink = optionaler Parameter (Format in Phase 4 am TV ermitteln):
- * wird als ApplicationControl-Datum «PAYLOAD» übergeben.
+ * Startet eine andere App über einen App-Control-Aufruf (nicht über launch()), damit Tizen den Aufrufer
+ * kennt und nach dem Beenden der anderen App zu dieser App zurückkehren kann (zusammen mit
+ * background-support in config.xml). deeplink = optionaler Startparameter: als Datum «PAYLOAD»
+ * (Samsung-Konvention «eden_resume», wie bei Smart-Hub-Preview-Deeplinks) und, falls es wie eine
+ * Adresse aussieht, zusätzlich als URI. Format je App undokumentiert.
  */
 export function launchApp(appId: string, deeplink: string | null): Promise<void> {
   const t = api();
   if (!t) return Promise.reject(new Error('Nur auf dem Fernseher möglich'));
   return new Promise((resolve, reject) => {
     const fail = (e: { message: string }) => reject(new Error(e.message));
-    if (deeplink) {
-      const data = [new t.application.ApplicationControlData('PAYLOAD', [deeplink])];
-      const ctrl = new t.application.ApplicationControl('http://tizen.org/appcontrol/operation/view', null, null, null, data);
-      t.application.launchAppControl(ctrl, appId, resolve, fail);
-    } else {
-      t.application.launch(appId, resolve, fail);
+    const plain = () => t.application.launch(appId, resolve, fail);
+    try {
+      const data = deeplink ? [new t.application.ApplicationControlData('PAYLOAD', [deeplink])] : [];
+      const uri = deeplink && /^[a-z][a-z0-9+.-]*:\/\//i.test(deeplink) ? deeplink : null;
+      const ctrl = new t.application.ApplicationControl('http://samsung.com/appcontrol/operation/eden_resume', uri, null, null, data);
+      // Schlägt der App-Control-Weg fehl, einfacher Start ohne Parameter
+      t.application.launchAppControl(ctrl, appId, resolve, plain);
+    } catch (e) {
+      plain();
     }
   });
 }

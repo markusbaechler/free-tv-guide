@@ -19,7 +19,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
 const SPORT_LABEL: Record<Sport, string> = { football: 'Fussball', icehockey: 'Eishockey', motorsport: 'Motorsport' };
 
 const state = {
-  tab: 'sport' as Tab,
+  tab: 'live' as Tab,
   filter: { sport: 'all', period: 'today', secondary: false } as Filter,
   data: null as GuideData | null,
   loading: true,
@@ -374,10 +374,9 @@ function openWatch(channelId: string, title: string | null, g: EventGroup | null
   // Nicht-SRG-Sender: Joyn (bevorzugt) oder Zattoo Free
   const ext: 'joyn' | 'zattoo' = ch && ch.app === 'joyn' ? 'joyn' : 'zattoo';
   if (!playable) {
-    const slot = ext === 'zattoo' && ch && ch.zattoo.slot ? ' (Programmplatz ' + ch.zattoo.slot + ')' : '';
-    lines.push(h('p', { class: 'dialog__hint' }, PLAYER_NOTE[ext] + ' Dort ' + name + slot + ' wählen.'));
+    lines.push(h('p', { class: 'dialog__hint' }, PLAYER_NOTE[ext] + ' Dort ' + name + ' wählen.'));
   }
-  pendingLaunch = { app: PLAYERS[ext], deeplink: ext === 'zattoo' && ch ? ch.zattoo.deeplink : null };
+  pendingLaunch = { app: PLAYERS[ext], deeplink: ch ? ch.deeplink : null };
 
   openOverlay(
     'watch',
@@ -557,6 +556,12 @@ function start(): void {
     if (!el) return;
     setFocus(el);
     activate(el);
+  });
+  // Rückkehr aus Joyn/Zattoo (App lief im Hintergrund): Daten und Anzeige auffrischen
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) return;
+    if (state.overlay) closeOverlay();
+    refresh();
   });
   renderKeys();
   render();

@@ -51,7 +51,7 @@ export function loadChannels(dir: string): Channel[] {
       country: c.country,
       epg: c.epg ?? null,
       app: c.app,
-      zattoo: { slot: c.zattoo?.slot ?? null, deeplink: c.zattoo?.deeplink ?? null },
+      deeplink: c.deeplink == null ? null : String(c.deeplink),
       verified: c.verified === true,
     };
   });

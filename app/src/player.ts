@@ -6,6 +6,7 @@ interface PlayerHandle {
   play(urn: string): void;
   onError(cb: (message: string) => void): void;
   onPlaying(cb: () => void): void;
+  quality(): string | null;
   dispose(): void;
 }
 
@@ -59,6 +60,9 @@ function showInfo(text: string | null, persistent: boolean): void {
     if (ch.nowTitle) info.appendChild(h('div', { class: 'pinfo__now' }, ch.nowTitle));
   }
   if (text) info.appendChild(h('div', { class: 'pinfo__msg' }, text));
+  // Bildgrösse des Streams (zur Beurteilung der Qualität; die Stufe wählt der Player nach Bandbreite)
+  const q = handle ? handle.quality() : null;
+  if (q) info.appendChild(h('div', { class: 'pinfo__msg' }, 'Bild: ' + q));
   info.appendChild(h('div', { class: 'pinfo__keys' }, 'Hoch/Runter: Sender wechseln · OK: Info · Zurück: Guide'));
   info.hidden = false;
   if (infoTimer !== null) window.clearTimeout(infoTimer);
