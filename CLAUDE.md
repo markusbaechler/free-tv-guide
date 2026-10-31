@@ -26,6 +26,8 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 - Chromium 63 löst Prozent-Höhen in Flex-Kindern nicht auf: Hauptbereich und Listen mit fester Höhe (832 px), sonst kein Scrollen am TV.
 - Version in `app/config.xml` bei jeder Installation erhöhen; sie wird im Status-Balken angezeigt.
 - Testen im Browser mit 1920×1080 und reiner Tastatursteuerung (Pfeiltasten, Enter, Backspace = Return).
+- **Vor jeder Installation auf dem TV:** `npm run check` und `npm run app:test-tv` (Fernseher-Simulator mit nachgebauten Tizen-APIs, `app/test-tv/`) müssen grün sein. Neue Erkenntnisse über API-Formen des TV gehören in `app/test-tv/mock-tizen.js`.
+- Tizen-TV-APIs: Zeiten als `tizen.TZDate` übergeben; Sat-Umschalten erst nach `tvwindow.show`; TV-Fenster `BEHIND` mit transparenter Seite.
 
 ## Befehle (Zielzustand)
 
@@ -35,6 +37,7 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 - `npm run app:build` – App nach `app/dist`
 - `npm run app:preview` – lokale Vorschau auf http://localhost:8080 (Daten live; mit `?data=./data/` aus `app/dist/data/`)
 - `npm run app:standalone` – eigenständige Vorschau-Seite mit eingebetteten Daten aus `out/` (vorher `npm run pipeline`)
+- `npm run app:test-tv` – Ende-zu-Ende im Fernseher-Simulator (braucht Playwright; im Container `PLAYWRIGHT_PATH=/opt/npm-tools/node_modules/playwright`)
 - Installation: `.wgt` nach `Downloads` kopieren, Apps2Samsung → Andere → Custom WGT / TPK → Herunterladen & Installieren. Bei «TV-Name konnte nicht gefunden werden»: TV neu starten.
 
 ## Arbeitsweise

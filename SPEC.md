@@ -51,10 +51,12 @@ Eine Tizen-Web-App mit drei Bereichen:
 - **Return/Back:** eine Ebene zurück, auf dem Startscreen Dialog «Beenden?».
 - Farbtasten als Filter, Farbe = Sportfarbe: grün = Fussball, blau = Eishockey, rot = Motorsport, gelb = alle. Browser-Vorschau: 1 rot, 2 grün, 3 gelb, 4 blau. Tasten mit `tizen.tvinputdevice.registerKey` registrieren.
 
-### 4.2 Tab «Jetzt live»
+### 4.2 Tab «Jetzt» (Start-Tab; Umbau 31.10.2026, v0.7)
 
-- Laufende Sport-Events (oben) und laufende Sendungen pro Sender (unten).
-- Badge «LIVE» und Restzeit.
+- Programmüberblick entlang der **Favoriten** (`favorites` in `channels.yaml`): eine Zeile je Sender mit Empfangsweg (Stream/Sat/App), laufender Sendung mit Fortschrittsbalken, Endzeit und Restzeit, sowie «danach hh:mm Titel». OK = einschalten über den ersten verfügbaren Weg.
+- «Sport läuft jetzt» nur, wenn gerade Live-Sport läuft (max. 3 Zeilen).
+- «Heute 20:15»: vor der Primetime die Sendung jedes Favoriten um 20:15 (OK → Dialog «Beginnt um 20:15 … jetzt einschalten»); danach «Später heute» (in 2 h).
+- Programmdaten: SRG aus der Pipeline (7 Tage), Sat-Sender aus dem Sat-Signal (`tizen.tvchannel.getProgramList`; der Fernseher hält nur ca. **12 h** im Speicher, siehe §9).
 
 ### 4.3 Tab «Sport»
 
@@ -65,12 +67,16 @@ Eine Tizen-Web-App mit drei Bereichen:
   - **Fussball:** Super League, Challenge League, UEFA CL/EL/ECL, Nati, **Bundesliga** (inkl. Highlight-Sendungen, separat markiert)
   - **Eishockey:** National League, NHL, Nati/WM, Spengler Cup, CHL
   - **Motorsport:** F1 (Qualifying, Sprint, Rennen), MotoGP
+- Quellen der Events: Pipeline (SRG-EPG, Rechteprüfung nach `rights.yaml`) **und** seit v0.9 das Sat-Programm der zugeordneten Sat-Sender, in der App mit denselben Regeln klassifiziert (`rules.json`, publiziert von der Pipeline). Für Sat-Sender keine Senderrechte-Prüfung: Was im Signal eines frei empfangbaren Senders steht, läuft dort. Sat-Events werden nicht mit anderen Sendern zusammengelegt (nur SRG-Parallelausstrahlungen).
 
 ### 4.4 Tab «Sender»
 
-- Raster mit allen Sendern aus `channels.yaml`. Pro Kachel: Name, «Jetzt» und «Danach», sofern EPG vorhanden.
-- Startliste: SRF 1, SRF zwei, SRF info, RTS 1, RTS 2, RSI LA 1, RSI LA 2, Das Erste, ZDF, 3sat, ORF 1, ORF 2, ServusTV, RTL, Sat.1, ProSieben, VOX, kabel eins, RTL Zwei, TV24, 3+, blue Zoom.
-- Ob jeder Sender in Zattoo Free CH enthalten ist, wird in Phase 4 am TV geprüft. Geprüfte Sender erhalten `verified: true`, fehlende werden aus channels.yaml entfernt.
+- Abschnitt «Favoriten» zuoberst (Reihenfolge aus `favorites`), danach Schweiz / Deutschland / Österreich. Pro Kachel: Name, «Jetzt» und «Danach», sofern EPG vorhanden, sonst der Empfangsweg («Livestream», «Sat · Kanal N», «über Joyn», «Nicht im Sat-Tuner · über Joyn»).
+- Zuunterst «Tuner-Diagnose» (API-Verfügbarkeit, Zuordnung, EPG-Zähler, Rohdaten, Fehler) – vor 1.0 hinter eine Tastenfolge legen.
+- **Empfangswege** je Sender in `sources` (Prioritätsreihenfolge, Entscheid 31.10.2026): 1. Direktstream in der App (`srg`/`direct`), 2. Sat-Tuner (`sat`, Zuordnung über Sendernamen der Tuner-Liste, HD zuerst), 3. externe App (`joyn`/`zattoo`). Die App nimmt den ersten verfügbaren Weg; scheitert ein Stream beim Abspielen, springt sie automatisch weiter.
+- **Zappen:** Hoch/Runter bzw. CH± im Stream-Player und im Sat-Bild laufen über eine gemeinsame Liste in Favoriten-Reihenfolge (Stream- und Sat-Sender gemischt); entprellt, Zielsender wird sofort gemerkt.
+- **Sat-Modus:** TV-Fenster hinter der transparenten App (`tizen.tvwindow.show`, zPosition BEHIND), Info-Leiste mit Sender, Sendung, Balken; OK = Info, Zurück = Guide. Reihenfolge beim Umschalten: erst Fenster, dann `tune` (sonst «Failed to set selected channel» nach dem Schliessen des Players), bis 2 Wiederholungen.
+- `tizen.tvchannel.getProgramList` verlangt `tizen.TZDate` als Startzeit; Einträge liefern `title`, `detailedDescription`, `startTime` (TZDate), teils `duration`. Fehlende Endzeit = Beginn der nächsten Sendung.
 
 ### 4.5 Aktion «OK» (neu ab 30.10.2026)
 
@@ -172,7 +178,20 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 ### 5.4 Schema `channels.json`
 
 ```json
-{ "id": "srf1", "name": "SRF 1", "country": "CH", "epg": "srg:srf:srf-1", "app": "srg", "deeplink": null, "verified": false, "live": { "urn": "urn:srf:video:…" } }
+{ "generatedAt": "…", "favorites": ["srf1", "srf2", "…"], "channels": [
+  { "id": "srf1", "name": "SRF 1", "country": "CH", "epg": "srg:srf:srf-1",
+    "sources": [ { "kind": "srg" }, { "kind": "sat", "names": ["SRF 1 HD", "SRF 1"] } ],
+    "deeplink": null, "verified": true, "live": { "urn": "urn:srf:video:…" } },
+  { "id": "telebasel", "name": "TeleBasel", "country": "CH", "epg": null,
+    "sources": [ { "kind": "direct", "url": "https://…/playlist.m3u8", "type": "hls", "source": "https://telebasel.ch/livestream", "checked": "2026-10-31" }, { "kind": "sat", "names": ["Telebasel HD"] }, { "kind": "zattoo" } ],
+    "deeplink": null, "verified": true, "live": { "url": "https://…/playlist.m3u8", "type": "hls" } }
+] }
+```
+
+Zusätzlich `rules.json`: Regex-Quelltexte aus `rules.yaml` (exclude, highlights, replay, sportHints, competitions) und je Wettbewerb `name`, `sport`, `reception` aus `rights.yaml` – für die Sport-Erkennung des Sat-Programms in der App.
+
+```json
+{ "_hinweis": "ältere Form bis v0.4" }
 ```
 
 ### 5.5 Auslieferung (Entscheid Phase 1)
@@ -237,11 +256,16 @@ free-tv-guide/
 | 2 ✅ | Tizen-App, Browser-Vorschau 1920×1080 (abgenommen 30.10.2026) | Claude | Alle Tabs per Tastatur (Pfeiltasten, Enter, Backspace) bedienbar, Build ohne Syntax neuer als ES2017 |
 | 3 ✅ | **Apps2Samsung 2.8.3** statt Tizen Studio (Entwicklungs-PC ist Windows-ARM; Tizen Studio nur x64). Entwicklermodus am TV (Apps → `12345` → On, Host-PC-IP 192.168.178.61, dann TV neu starten). TV 192.168.178.21 (abgenommen 31.10.2026) | Nutzer, angeleitet | Apps2Samsung findet den TV |
 | 4 ✅ | Build (`npm run app:build`), unsigniertes `.wgt` (`zip -X -r`), Installation über Apps2Samsung «Andere → Custom WGT / TPK», SRG-Livestream am TV, Joyn/Zattoo-IDs (abgenommen 31.10.2026, v0.1.4) | Claude Code | App startet auf dem TV, OK spielt SRF zwei live in 1920×1080 ab ✅ |
+| 4b ✅ | Sat-Tuner als Empfangsweg (`tizen.tvchannel`/`tvwindow`, beide öffentlich auf Tizen 5.0), Empfangswege mit Priorität, Favoriten, Tab «Jetzt», Einblendung im Sat-Bild, Sport aus dem Sat-Programm; Fernseher-Simulator `npm run app:test-tv` (abgenommen 31.10.2026, v0.10.0) | Claude Code | Das Erste per OK im Sat-Bild mit Info-Leiste; Zappen SRF → Sat → SRF; Simulator grün |
 | 5 | Betrieb: jährliche Erinnerung «rights.yaml prüfen» (Juli) | Automatisch | Erinnerung aktiv |
+| 6 | Weg zu 1.0: Zahlentasten/letzter Sender, Tuner-Liste und EPG im Speicher, Diagnose hinter Tastenfolge, Aufräumen `main.ts`, 7-Tage-Probe im Alltag | Claude Code | 7 Tage Nutzung ohne Neuinstallation |
 
 ## 9. Offene Punkte und Risiken
 
 1. **Joyn-/Zattoo-Deep-Link:** nicht möglich (siehe 4.5a). App öffnet, Sender dort wählen.
+12. **Sat-EPG nur ~12 h:** Der Tuner liefert über `getProgramList` nur das zwischengespeicherte EPG (≈ 12 Sendungen je Sender, 127 Einträge für 10 Sender am 31.10.2026), nicht die 7 Tage aus dem Signal. Sport-Planung «Morgen/7 Tage» damit nur für SRG. Abhilfe nur über eine Internet-Programmquelle für DE-Sender mit klaren Nutzungsbedingungen (Prüfung offen, §5.1).
+13. **Verschlüsselte Sat-Sender (ORF):** `tune` meldet «kein Signal»; die App zeigt den Hinweis, schaltet aber nicht automatisch auf Zattoo um.
+14. **Tuner-Zuordnung über Namen:** bricht nach Sendersuchlauf/Umbenennung; `_serviceId` als zweites Merkmal vorgesehen.
 10. **Entwickler-Verbindung:** Nach Standby meldet Apps2Samsung «TV-Name konnte nicht gefunden werden», obwohl der TV im Scan erscheint. Abhilfe: TV neu starten (Power 5 s).
 11. **Chromium 63:** Prozent-Höhen in Flex-Kindern werden nicht aufgelöst (Listen liefen unter die Fusszeile, kein Scrollen). Hauptbereich und Listen haben feste Höhe 832 px.
 9. **Joyn Schweiz auf Samsung:** Joyn-App laut Herstellerangaben ab Samsung-Baujahr 2017; Verfügbarkeit im Schweizer Samsung-Store und Sport-Sperren (Geoblocking) bei ARD/ZDF über Joyn CH am TV prüfen.
