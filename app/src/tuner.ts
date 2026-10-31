@@ -105,7 +105,7 @@ export function showTvWindow(): Promise<string> {
         (e) => reject(new Error('tvwindow.show: ' + e.message)),
         ['0px', '0px', '1920px', '1080px'],
         'MAIN',
-        'FRONT',
+        'BEHIND',
       );
     } catch (e) {
       reject(e instanceof Error ? e : new Error(String(e)));

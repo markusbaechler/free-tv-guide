@@ -333,6 +333,46 @@ function refreshTunerEpg(): void {
   next();
 }
 
+// ---------------------------------------------------------------- Sat-Sichtmodus: App transparent, TV-Bild dahinter, Info-Leiste
+
+let satInfoTimer: number | null = null;
+
+function satViewEnter(): void {
+  document.documentElement.classList.add('is-sat');
+  $('satview').hidden = false;
+}
+
+function satViewLeave(): void {
+  document.documentElement.classList.remove('is-sat');
+  $('satview').hidden = true;
+  const info = document.getElementById('sat-info');
+  if (info) info.hidden = true;
+  if (satInfoTimer !== null) window.clearTimeout(satInfoTimer);
+  satInfoTimer = null;
+}
+
+/** Info-Leiste im Sat-Bild: Sender, laufende Sendung mit Restzeit, danach; blendet nach 5 s aus */
+function satShowInfo(channelId: string, msg: string | null, persistent: boolean): void {
+  const info = document.getElementById('sat-info');
+  if (!info) return;
+  const c = channelById(channelId);
+  const now = new Date();
+  const nn = c ? nowNext(epgFor(c), now) : { now: null, next: null };
+  const m = state.tuner.matched[channelId];
+  clear(info);
+  info.appendChild(h('div', { class: 'pinfo__name' }, (c ? c.name : channelId) + (m && m.major !== null ? '  ·  Sat ' + m.major : '')));
+  if (nn.now) {
+    info.appendChild(h('div', { class: 'pinfo__now' }, nn.now.title + (nn.now.end ? '  ·  bis ' + time(nn.now.end) + '  ·  ' + remaining(nn.now.end, now) : '')));
+    info.appendChild(h('div', { class: 'prow__bar' }, h('i', { style: 'width:' + Math.round(progress(nn.now, now) * 100) + '%' })));
+  }
+  if (nn.next) info.appendChild(h('div', { class: 'pinfo__now' }, 'danach ' + time(nn.next.start) + '  ' + nn.next.title));
+  if (msg) info.appendChild(h('div', { class: 'pinfo__msg' }, msg));
+  info.appendChild(h('div', { class: 'pinfo__keys' }, 'Hoch/Runter: Sender wechseln · OK: Info · Zurück: Guide'));
+  info.hidden = false;
+  if (satInfoTimer !== null) window.clearTimeout(satInfoTimer);
+  satInfoTimer = persistent ? null : window.setTimeout(() => (info.hidden = true), 5000);
+}
+
 function openSat(channelId: string, done?: () => void): void {
   const m = state.tuner.matched[channelId];
   if (!m) return;
@@ -340,11 +380,14 @@ function openSat(channelId: string, done?: () => void): void {
   else if (!state.tuner.tvOpen) rememberFocus();
   state.tuner.current = channelId;
   zapCurrent = channelId;
+  satViewEnter();
+  satShowInfo(channelId, 'Wird umgeschaltet …', true);
   // Reihenfolge: zuerst TV-Bild (gibt dem Tuner die Videoebene), dann umschalten; ein Fehlversuch wird wiederholt
   const tune = (attempt: number) => {
     tuneTo(m).then(
       (r) => {
         if (r !== 'ok') tunerLog('Tune ' + m.name + ': ' + r);
+        satShowInfo(channelId, r === 'ok' ? null : 'Kein Signal – Sender verschlüsselt oder nicht empfangbar.', r !== 'ok');
         if (done) done();
       },
       (e: Error) => {
@@ -353,7 +396,7 @@ function openSat(channelId: string, done?: () => void): void {
           return;
         }
         tunerLog('Fehler ' + e.message + ' (' + m.name + ')');
-        closeTvWindow();
+        satShowInfo(channelId, 'Umschalten fehlgeschlagen: ' + e.message, true);
         if (done) done();
       },
     );
@@ -370,6 +413,7 @@ function openSat(channelId: string, done?: () => void): void {
     },
     (e: Error) => {
       tunerLog('Fehler ' + e.message);
+      satViewLeave();
       render();
       if (done) done();
     },
@@ -419,6 +463,7 @@ function zap(step: number): void {
   }
   // Stream: Sat-Bild zu, dann Player (läuft er schon, nur umschalten)
   if (state.tuner.tvOpen) {
+    satViewLeave();
     hideTvWindow().then(() => {
       state.tuner.tvOpen = false;
       play(nextCh.id);
@@ -443,6 +488,10 @@ function satKey(code: number): boolean {
   }
   if (code === 40 || code === 428) {
     zap(1);
+    return true;
+  }
+  if (code === 13 && state.tuner.current) {
+    satShowInfo(state.tuner.current, null, false);
     return true;
   }
   return true;
@@ -672,6 +721,7 @@ function openTvWindow(retry: boolean = true): void {
 }
 
 function closeTvWindow(): void {
+  satViewLeave();
   hideTvWindow().then(() => {
     state.tuner.tvOpen = false;
     zapCurrent = null;

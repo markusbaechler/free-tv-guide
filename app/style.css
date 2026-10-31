@@ -24,6 +24,13 @@ html, body {
   height: 1080px;
   overflow: hidden;
   background: var(--bg);
+}
+/* Sat-Modus: Seite transparent, damit das TV-Fenster (zPosition BEHIND) durchscheint */
+html.is-sat, html.is-sat body { background: transparent; }
+html.is-sat .app, html.is-sat .overlay { visibility: hidden; }
+.satview { position: fixed; left: 0; top: 0; width: 1920px; height: 1080px; z-index: 9; background: transparent; }
+.satview[hidden] { display: none; }
+body {
   color: var(--ink);
   font-family: var(--font);
   font-size: 30px;
@@ -459,3 +466,4 @@ button {
 .prow.is-focused .prow__title--none { color: var(--focus-ink); }
 .prow.is-focused .prow__bar { background: rgba(11, 34, 64, 0.25); }
 .prow.is-focused .prow__bar i { background: var(--focus-ink); }
+.pinfo .prow__bar { width: 900px; margin: 14px 0 6px; }
