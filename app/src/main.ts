@@ -384,7 +384,13 @@ function zap(step: number): void {
   zapCurrent = nextCh.id;
   zapBusyUntil = now + 1500; // Sicherheitsnetz, falls ein Rückruf ausbleibt
   if (w.kind === 'sat') {
-    if (isPlaying()) closePlayer();
+    if (isPlaying()) {
+      // Player erst freigeben, dem Fernseher kurz Zeit lassen, dann Tuner
+      closePlayer();
+      zapBusyUntil = now + 2500;
+      window.setTimeout(() => openSat(nextCh.id, zapDone), 400);
+      return;
+    }
     openSat(nextCh.id, zapDone);
     return;
   }
@@ -561,13 +567,21 @@ function tunerAction(key: string): void {
   }
 }
 
-function openTvWindow(): void {
+function openTvWindow(retry: boolean = true): void {
   showTvWindow().then(
     (r) => {
       state.tuner.tvOpen = true;
       tunerLog('TV-Bild: ' + r);
     },
-    (e: Error) => tunerLog('Fehler ' + e.message),
+    (e: Error) => {
+      // Direkt nach dem Schliessen des Internet-Players kann die Videoebene noch belegt sein → einmal später nochmals
+      if (retry) {
+        window.setTimeout(() => openTvWindow(false), 600);
+        return;
+      }
+      tunerLog('Fehler ' + e.message);
+      render();
+    },
   );
 }
 
