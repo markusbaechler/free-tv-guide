@@ -29,9 +29,26 @@ interface SysInfoApi {
   getPropertyValue(prop: string, ok: (v: unknown) => void, err?: (e: { message: string }) => void): void;
 }
 
-function tz(): { tvchannel?: TvChannelApi; tvwindow?: TvWindowApi; systeminfo?: SysInfoApi } | null {
-  const t = (window as unknown as { tizen?: { tvchannel?: TvChannelApi; tvwindow?: TvWindowApi; systeminfo?: SysInfoApi } }).tizen;
+interface TizenNs {
+  tvchannel?: TvChannelApi;
+  tvwindow?: TvWindowApi;
+  systeminfo?: SysInfoApi;
+  /** Tizen-Zeittyp; die TV-APIs erwarten ihn statt JavaScript-Date */
+  TZDate?: new (d: Date) => unknown;
+}
+
+function tz(): TizenNs | null {
+  const t = (window as unknown as { tizen?: TizenNs }).tizen;
   return t || null;
+}
+
+/** Zeitpunkt in der Form, die die Tizen-APIs erwarten (TZDate, sonst Date) */
+function tzDate(t: TizenNs, d: Date): unknown {
+  try {
+    return t.TZDate ? new t.TZDate(d) : d;
+  } catch (e) {
+    return d;
+  }
 }
 
 export function tunerAvailable(): { channel: boolean; window: boolean } {
@@ -133,7 +150,7 @@ export function programNow(ch: TunerChannel): Promise<string> {
     try {
       t.tvchannel!.getProgramList(
         ch.raw,
-        new Date(),
+        tzDate(t, new Date()) as Date,
         (list) => resolve(list.length ? JSON.stringify(list[0]).slice(0, 300) : 'keine Programmdaten'),
         (e) => reject(new Error('getProgramList: ' + e.message)),
         2 * 3600,
@@ -237,7 +254,7 @@ export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry
     try {
       t.tvchannel!.getProgramList(
         ch.raw,
-        new Date(),
+        tzDate(t, new Date()) as Date,
         (list) => {
           const out: TunerEpgEntry[] = [];
           lastEpgSample = list.length ? JSON.stringify(list[0], (k, val) => (val && typeof val === 'object' && typeof (val as { getUTCFullYear?: unknown }).getUTCFullYear === 'function' ? String(val) : val)).slice(0, 220) : 'leer';
