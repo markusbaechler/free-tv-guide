@@ -25,16 +25,25 @@ function api(): TizenApi | null {
 
 export const isTizen = (): boolean => api() !== null;
 
-/** Farbtasten registrieren, damit sie bei der App ankommen */
+/** Ergebnis der Tastenregistrierung (Diagnose): registriert / abgelehnt */
+export const keyRegistration: { ok: string[]; failed: string[] } = { ok: [], failed: [] };
+
+/** Farb-, Kanal-, Ziffern- und Medientasten registrieren, damit sie bei der App ankommen */
 export function registerKeys(): void {
   const t = api();
   if (!t || !t.tvinputdevice) return;
-  const keys = ['ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue', 'ChannelUp', 'ChannelDown'];
+  const keys = [
+    'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue', 'ChannelUp', 'ChannelDown',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'Info', 'PreCh', 'MediaPlayPause', 'MediaPlay', 'MediaPause', 'ChannelList', 'Guide', 'Tools', 'Extra', 'Caption',
+  ];
   for (const k of keys) {
     try {
       t.tvinputdevice.registerKey(k);
+      keyRegistration.ok.push(k);
     } catch (e) {
-      // Taste auf diesem Modell nicht vorhanden
+      // Taste auf diesem Modell nicht vorhanden oder systemreserviert
+      keyRegistration.failed.push(k);
     }
   }
 }

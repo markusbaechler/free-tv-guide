@@ -100,6 +100,15 @@ check(/Relegation Hinspiel/.test(sport), 'Bundesliga-Spiel am Tag 3 gefunden (EP
 check(/Sat-EPG-Einträge: (4[0-9]|[5-9][0-9])/.test(diag), 'EPG-Einträge ≥ 40 trotz 12er-Limit je Abruf: ' + (diag.match(/Sat-EPG-Einträge: \d+/) || [''])[0]);
 check(!/Snooker/.test(sport), 'Snooker (keine Zielsportart) nicht im Sport-Tab');
 
+console.log('Tastenlogger:');
+await page.click('[data-key="tab:channels"]');
+await page.waitForTimeout(300);
+await page.keyboard.press('ArrowLeft');
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(300);
+const keys = await page.evaluate(() => Array.from(document.querySelectorAll('.channels-view .note')).map((n) => n.innerText).filter((x) => /^Tasten/.test(x)).join(''));
+check(/ArrowRight=39/.test(keys) && /ArrowLeft=37/.test(keys), 'Tastenlogger zeigt Taste=Code: ' + keys.slice(0, 80));
+
 console.log('Sat-Sichtmodus und Zappen:');
 await page.click('[data-key="tab:channels"]');
 await page.waitForTimeout(300);

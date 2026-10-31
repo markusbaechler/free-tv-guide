@@ -6,7 +6,7 @@ import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './for
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
 import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
-import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
+import { exitApp, isTizen, keyRegistration, launchApp, registerKeys } from './tizen.ts';
 import { satEvents, unclassifiedSportTitles } from './satsport.ts';
 import { hideTvWindow, lastEpgSample, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
@@ -652,6 +652,9 @@ function renderChannels(main: HTMLElement, now: Date): void {
 
 // ---------------------------------------------------------------- Sat-Tuner (Probe)
 
+/** Letzte Tastendrücke: Taste=Code(Modus) */
+const keyLog: string[] = [];
+
 function tunerLog(line: string): void {
   state.tuner.log = [line].concat(state.tuner.log).slice(0, 6);
   if (!state.tuner.tvOpen) render();
@@ -683,6 +686,8 @@ function renderTunerProbe(box: HTMLElement): void {
     }
     box.appendChild(h('p', { class: 'note' }, 'Sat-EPG-Einträge: ' + total + ' · Sport ohne Wettbewerb: ' + hints.length + (hints.length ? ' – ' + hints.slice(0, 6).join(' · ') : '')));
   }
+  box.appendChild(h('p', { class: 'note', id: 'key-log' }, 'Tasten (neueste zuerst): ' + (keyLog.length ? keyLog.join('  ') : '–')));
+  box.appendChild(h('p', { class: 'note' }, 'Registriert: ' + (keyRegistration.ok.join(' ') || '–') + (keyRegistration.failed.length ? ' · abgelehnt: ' + keyRegistration.failed.join(' ') : '')));
   box.appendChild(
     h('p', { class: 'note' }, 'EPG-Rohdaten: ' + (lastEpgSample || '–') + (t.epgError ? ' · Fehler: ' + t.epgError : '')),
   );
@@ -1135,6 +1140,13 @@ function refresh(): void {
 
 function start(): void {
   registerKeys();
+  // Tastenlogger (Diagnose): welche Tasten der Fernbedienung erreichen die App, mit welchem Code
+  document.addEventListener('keydown', (e) => {
+    keyLog.unshift((e.key && e.key !== 'Unidentified' ? e.key : '?') + '=' + e.keyCode + (state.tuner.tvOpen ? '(Sat)' : isPlaying() ? '(Stream)' : ''));
+    if (keyLog.length > 12) keyLog.length = 12;
+    const el = document.getElementById('key-log');
+    if (el) el.textContent = 'Tasten (neueste zuerst): ' + keyLog.join('  ');
+  });
   document.addEventListener('keydown', onKey);
   // Maus/Pointer in der Vorschau: Klick = Fokus + OK
   document.addEventListener('click', (e) => {
