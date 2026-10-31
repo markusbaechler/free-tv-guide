@@ -340,14 +340,37 @@ function openSat(channelId: string, done?: () => void): void {
   else if (!state.tuner.tvOpen) rememberFocus();
   state.tuner.current = channelId;
   zapCurrent = channelId;
-  tuneTo(m).then(
+  // Reihenfolge: zuerst TV-Bild (gibt dem Tuner die Videoebene), dann umschalten; ein Fehlversuch wird wiederholt
+  const tune = (attempt: number) => {
+    tuneTo(m).then(
+      (r) => {
+        if (r !== 'ok') tunerLog('Tune ' + m.name + ': ' + r);
+        if (done) done();
+      },
+      (e: Error) => {
+        if (attempt < 2) {
+          window.setTimeout(() => tune(attempt + 1), 700);
+          return;
+        }
+        tunerLog('Fehler ' + e.message + ' (' + m.name + ')');
+        closeTvWindow();
+        if (done) done();
+      },
+    );
+  };
+  if (state.tuner.tvOpen) {
+    tune(0);
+    return;
+  }
+  showTvWindow().then(
     (r) => {
-      if (r !== 'ok') tunerLog('Tune ' + m.name + ': ' + r);
-      if (!state.tuner.tvOpen) openTvWindow();
-      if (done) done();
+      state.tuner.tvOpen = true;
+      tunerLog('TV-Bild: ' + r);
+      tune(0);
     },
     (e: Error) => {
       tunerLog('Fehler ' + e.message);
+      render();
       if (done) done();
     },
   );
