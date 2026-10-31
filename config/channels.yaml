@@ -22,7 +22,7 @@ channels:
   - { id: 5plus,    name: "5+",         country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tv24,     name: "TV24",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tv25,     name: "TV25",       country: CH, epg: null, app: joyn, deeplink: null, verified: false }
-  - { id: telezueri, name: "TeleZüri",  country: CH, epg: null, app: joyn, deeplink: '{"values":"telezueri"}', verified: false }  # Deeplink-Versuch C (Samsung-PAYLOAD-JSON). Gescheitert: A https://www.joyn.ch/play/live-tv/telezueri, B joyn://live-tv/telezueri – Joyn öffnete nur die Startseite
+  - { id: telezueri, name: "TeleZüri",  country: CH, epg: null, app: joyn, deeplink: null, verified: true }  # Deeplink-Versuche gescheitert (SPEC.md 4.5a); in Joyn CH gelistet
   - { id: telebaern, name: "TeleBärn",  country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: telem1,   name: "Tele M1",    country: CH, epg: null, app: joyn, deeplink: null, verified: false }
   - { id: tele1,    name: "Tele 1",     country: CH, epg: null, app: joyn, deeplink: null, verified: false }

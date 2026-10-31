@@ -74,17 +74,17 @@ Eine Tizen-Web-App mit drei Bereichen:
 
 - Event auf SRG-Sender, läuft oder beginnt in < 15 Min. → sofort Vollbild-Player.
 - Event später → Dialog «Beginnt um …» mit «<Sender> jetzt einschalten».
-- Sender-Kachel mit SRG-Livestream → sofort Player. Ohne → Dialog mit Zattoo-Hinweis (Werbung, 10 h/Monat).
-- Im Player: Hoch/Runter bzw. CH+/CH− wechselt zwischen den SRG-Sendern, OK zeigt Info, Zurück führt in den Guide.
+- Sender-Kachel mit SRG-Livestream → sofort Player. Ohne → Dialog mit Joyn- bzw. Zattoo-Hinweis und Knopf «Joyn/Zattoo öffnen».
+- Im Player: Hoch/Runter bzw. CH+/CH− wechselt zwischen den SRG-Sendern, OK zeigt Info inkl. Bildgrösse (z. B. 1920×1080), Zurück führt in den Guide. Der Player startet mit hoher Bandbreitenschätzung (20 Mbit/s), sonst beginnt er am TV mit 640×360.
+- Start-Tab ist «Jetzt live». Der Status-Balken zeigt «Stand hh:mm» der Daten und die App-Version (aus `config.xml`).
 - Player-Code (Pillarbox + video.js, ~800 KB) liegt in `player.js` und wird erst beim ersten Abspielen geladen. `globalThis` wird für Chromium 63 per Banner nachgerüstet.
 
-### 4.5a Aktion «OK» (ursprünglich, nur noch für Nicht-SRG-Sender)
+### 4.5a Aktion «OK» für Nicht-SRG-Sender (Ergebnis Phase 4, 31.10.2026)
 
-1. Zattoo-App per `tizen.application.launchAppControl` starten, falls möglich mit Sender-Parameter.
-2. **Fallback**, falls kein Deep-Link möglich ist: App öffnen und Hinweis «In Zattoo Sender X wählen» einblenden. Optional mit Programmplatz aus `channels.yaml`.
-3. Für SRF-Sport-Livestreams ohne TV-Ausstrahlung: Play SRF starten (gleiches Muster).
-
-> **Offen:** Zattoo-Tizen-App-ID und unterstützte Deep-Link-Parameter. Wird in Phase 4 auf dem TV ermittelt (installierte Apps über `sdb shell` auflisten, Launch testen).
+1. Joyn bzw. Zattoo per `tizen.application.launchAppControl` (Operation `eden_resume`, Datum `PAYLOAD`, bei Adressen zusätzlich als URI) starten; Fallback `launch()`. App-IDs am QE75Q70R: Joyn `2200MKoe7c.ZAPPNTV`, Zattoo `QZf9YjXnoV.Zattoo` (`app/src/settings.ts`).
+2. **Kein Deep-Link möglich:** Joyn öffnet immer nur seine Startseite. Getestet mit TeleZüri (in Joyn CH gelistet): Web-Adresse `https://www.joyn.ch/play/live-tv/telezueri` (URI + PAYLOAD), `joyn://live-tv/telezueri`, PAYLOAD-JSON `{"values":"telezueri"}`. Keine der Varianten wirkt; weder Joyn noch Zattoo dokumentieren eine Schnittstelle. Der Sender wird in der App gewählt; der Dialog sagt das («Dort X wählen»). Das Feld `deeplink` in `channels.yaml` bleibt für künftige Versuche (Daten laden ohne Neuinstallation).
+3. **Rückkehr in den Guide:** Joyn/Zattoo kehren beim Beenden nicht zum Aufrufer zurück (Return in Joyn = Joyn-Startseite, Return lang ohne Wirkung). Rückweg über Home-Taste. `background-support` ist aktiv, damit die App im Hintergrund bleibt; beim Sichtbarwerden lädt sie die Daten neu.
+4. Für SRF-Sport-Livestreams ohne TV-Ausstrahlung: Play SRF starten (gleiches Muster).
 
 ### 4.5b Darstellung (Entscheid Phase 2)
 
@@ -165,7 +165,7 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 ### 5.4 Schema `channels.json`
 
 ```json
-{ "id": "srf1", "name": "SRF 1", "country": "CH", "epg": "srg:srf:srf-1", "zattoo": { "slot": null, "deeplink": null }, "verified": false }
+{ "id": "srf1", "name": "SRF 1", "country": "CH", "epg": "srg:srf:srf-1", "app": "srg", "deeplink": null, "verified": false, "live": { "urn": "urn:srf:video:…" } }
 ```
 
 ### 5.5 Auslieferung (Entscheid Phase 1)
@@ -228,18 +228,20 @@ free-tv-guide/
 | 0 | GitHub-Repo `free-tv-guide` (öffentlich), SRG-API-Konto und Key, Secrets setzen | Nutzer | Repo existiert, Secrets gesetzt (`meta.json` → `srg.status` ≠ `missing-credentials`) |
 | 1 ✅ | Pipeline, Config, Workflow, Branch `data` (abgenommen 30.10.2026) | Claude | `events.json` wird automatisch erzeugt, enthält ≥ 1 Free-Event pro Sportart im 7-Tage-Fenster (sofern im Kalender vorhanden) |
 | 2 ✅ | Tizen-App, Browser-Vorschau 1920×1080 (abgenommen 30.10.2026) | Claude | Alle Tabs per Tastatur (Pfeiltasten, Enter, Backspace) bedienbar, Build ohne Syntax neuer als ES2017 |
-| 3 | Tizen Studio + TV-Extension, Samsung-Zertifikat (mit DUID des TVs), Entwicklermodus am TV (Apps → `12345` → Developer Mode ON, IP des PCs) | Nutzer, angeleitet | `sdb devices` zeigt den TV |
-| 4 | Build, Signieren, Installieren, SRG-Livestream am TV testen, Zattoo-App-ID für Nicht-SRG-Sender ermitteln | Claude Code lokal | App startet auf dem TV, OK spielt SRF zwei live ab |
+| 3 ✅ | **Apps2Samsung 2.8.3** statt Tizen Studio (Entwicklungs-PC ist Windows-ARM; Tizen Studio nur x64). Entwicklermodus am TV (Apps → `12345` → On, Host-PC-IP 192.168.178.61, dann TV neu starten). TV 192.168.178.21 (abgenommen 31.10.2026) | Nutzer, angeleitet | Apps2Samsung findet den TV |
+| 4 ✅ | Build (`npm run app:build`), unsigniertes `.wgt` (`zip -X -r`), Installation über Apps2Samsung «Andere → Custom WGT / TPK», SRG-Livestream am TV, Joyn/Zattoo-IDs (abgenommen 31.10.2026, v0.1.4) | Claude Code | App startet auf dem TV, OK spielt SRF zwei live in 1920×1080 ab ✅ |
 | 5 | Betrieb: jährliche Erinnerung «rights.yaml prüfen» (Juli) | Automatisch | Erinnerung aktiv |
 
 ## 9. Offene Punkte und Risiken
 
-1. **Joyn-/Zattoo-App-ID und Deep-Link:** unbekannt, in Phase 4 am TV ermitteln. Fallback: App öffnet, Sender dort wählen.
+1. **Joyn-/Zattoo-Deep-Link:** nicht möglich (siehe 4.5a). App öffnet, Sender dort wählen.
+10. **Entwickler-Verbindung:** Nach Standby meldet Apps2Samsung «TV-Name konnte nicht gefunden werden», obwohl der TV im Scan erscheint. Abhilfe: TV neu starten (Power 5 s).
+11. **Chromium 63:** Prozent-Höhen in Flex-Kindern werden nicht aufgelöst (Listen liefen unter die Fusszeile, kein Scrollen). Hauptbereich und Listen haben feste Höhe 832 px.
 9. **Joyn Schweiz auf Samsung:** Joyn-App laut Herstellerangaben ab Samsung-Baujahr 2017; Verfügbarkeit im Schweizer Samsung-Store und Sport-Sperren (Geoblocking) bei ARD/ZDF über Joyn CH am TV prüfen.
-8. **Pillarbox auf Tizen 5.0 (Chromium ~63):** Bundle besteht die ES2017-Prüfung; ob MSE/EME (DRM) der SRG-Livestreams auf dem Q70R funktionieren, zeigt erst der Test am TV (Phase 4). Fallback: Livestream über das Handy per AirPlay.
+8. **Pillarbox auf Tizen 5.0 (Chromium ~63):** ✅ läuft auf dem Q70R inkl. DRM, 1920×1080 (31.10.2026).
 2. **EPG für Nicht-SRG-Sender:** keine Quelle mit klaren Nutzungsbedingungen. NHL, National League (TV24/3+), Challenge League (blue Zoom) und Bundesliga (Sat.1) nur über `manual_events.yaml`.
 7. **SRG-Feldnamen und Kontingent:** nicht offiziell dokumentiert. Pipeline liest defensiv, protokolliert die Struktur in `debug/srg-shape.json`; Regeln nach dem ersten echten Lauf anhand von `debug/unclassified.json` nachschärfen.
 3. **Bundesliga in CH:** Free-Empfang unklar. Im Guide als «Empfang unsicher» markieren, bis in Phase 4 verifiziert.
 4. **Web-Engine-Version:** auf dem TV verifizieren und bei Abweichung das Build-Target anpassen.
-5. **Samsung-Zertifikat:** Gültigkeitsdauer unklar. Neu-Signieren als Skript in `scripts/tv/`.
+5. **Signieren:** entfällt – Apps2Samsung installiert das unsignierte `.wgt` ohne Samsung-Konto. `scripts/tv/install.ps1` (Tizen Studio) nicht umgesetzt.
 6. **Rechtewechsel 2027:** wird über `rights.yaml` abgefangen.

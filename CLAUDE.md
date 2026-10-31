@@ -6,7 +6,7 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 
 - Tizen-Web-App für Samsung QE75Q70R (2019, Tizen 5.0, Chromium ~M63). Nutzer in der Schweiz.
 - Die App bündelt legale Free-TV-Programminfos. SRG-Sender spielt sie selbst ab (Pillarbox), andere Sender nur über die Zattoo-App.
-- Entwicklungs-PC: Windows. Skripte in PowerShell.
+- Entwicklungs-PC: Windows auf ARM (kein Tizen Studio). Installation auf dem TV über **Apps2Samsung** (Custom WGT / TPK), unsigniertes `.wgt` aus `app/dist` mit `zip -X -r`.
 
 ## Harte Regeln
 
@@ -23,6 +23,8 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 - Verboten im Output: `?.`, `??`, `flex`-`gap`, ES-Module. Nach jedem Build mit einem Skript auf diese Syntax prüfen (`app/check-syntax.mjs`, prüft `app.js` und `player.js`).
 - `player.js` (Pillarbox + video.js) wird lazy geladen; `globalThis` nur über den Build-Banner nachrüsten.
 - Jeder Zugriff auf `localStorage` in `try/catch`.
+- Chromium 63 löst Prozent-Höhen in Flex-Kindern nicht auf: Hauptbereich und Listen mit fester Höhe (832 px), sonst kein Scrollen am TV.
+- Version in `app/config.xml` bei jeder Installation erhöhen; sie wird im Status-Balken angezeigt.
 - Testen im Browser mit 1920×1080 und reiner Tastatursteuerung (Pfeiltasten, Enter, Backspace = Return).
 
 ## Befehle (Zielzustand)
@@ -33,7 +35,7 @@ Massgeblich ist **SPEC.md**. Bei Widerspruch gilt SPEC.md. Bei Unklarheit nachfr
 - `npm run app:build` – App nach `app/dist`
 - `npm run app:preview` – lokale Vorschau auf http://localhost:8080 (Daten live; mit `?data=./data/` aus `app/dist/data/`)
 - `npm run app:standalone` – eigenständige Vorschau-Seite mit eingebetteten Daten aus `out/` (vorher `npm run pipeline`)
-- `scripts/tv/install.ps1` – Signieren, `sdb connect <TV-IP>`, Installieren, Starten
+- Installation: `.wgt` nach `Downloads` kopieren, Apps2Samsung → Andere → Custom WGT / TPK → Herunterladen & Installieren. Bei «TV-Name konnte nicht gefunden werden»: TV neu starten.
 
 ## Arbeitsweise
 
