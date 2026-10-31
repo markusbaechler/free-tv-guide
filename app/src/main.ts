@@ -5,7 +5,7 @@ import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './f
 import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
-import { closePlayer, isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
+import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
 import { hideTvWindow, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
@@ -333,14 +333,6 @@ function refreshTunerEpg(): void {
   next();
 }
 
-/** Zuordnete Sat-Sender in Listenreihenfolge (für Hoch/Runter im Sichtmodus) */
-function satChannels(): Channel[] {
-  return orderedChannels().filter((c) => {
-    const w = firstWay(c);
-    return !!w && w.kind === 'sat';
-  });
-}
-
 function openSat(channelId: string): void {
   const m = state.tuner.matched[channelId];
   if (!m) return;
@@ -356,12 +348,37 @@ function openSat(channelId: string): void {
   );
 }
 
-function satStep(step: number): void {
-  const list = satChannels();
+/** Gemeinsame Zapp-Liste: alle Sender, die die App selbst zeigt (Stream oder Sat), in Favoriten-Reihenfolge */
+function zapList(): Channel[] {
+  return orderedChannels().filter((c) => {
+    const w = firstWay(c);
+    return !!w && w.kind !== 'ext';
+  });
+}
+
+/** Hoch/Runter: nächster Sender der gemeinsamen Liste, unabhängig vom Empfangsweg */
+function zap(step: number): void {
+  const list = zapList();
   if (!list.length) return;
-  const i = list.map((c) => c.id).indexOf(state.tuner.current || '');
+  const current = state.tuner.tvOpen ? state.tuner.current : currentPlayerChannel();
+  const i = list.map((c) => c.id).indexOf(current || '');
   const nextCh = list[(i + step + list.length) % list.length]!;
-  openSat(nextCh.id);
+  const w = firstWay(nextCh);
+  if (!w) return;
+  if (w.kind === 'sat') {
+    if (isPlaying()) closePlayer();
+    openSat(nextCh.id);
+    return;
+  }
+  // Stream: Sat-Bild zu, dann Player (läuft er schon, nur umschalten)
+  if (state.tuner.tvOpen) {
+    hideTvWindow().then(() => {
+      state.tuner.tvOpen = false;
+      play(nextCh.id);
+    });
+    return;
+  }
+  if (!switchPlayerChannel(nextCh.id)) play(nextCh.id);
 }
 
 /** Tasten im Sat-Sichtmodus (TV-Bild vor der App). true = verarbeitet */
@@ -372,11 +389,11 @@ function satKey(code: number): boolean {
     return true;
   }
   if (code === 38 || code === 427) {
-    satStep(-1);
+    zap(-1);
     return true;
   }
   if (code === 40 || code === 428) {
-    satStep(1);
+    zap(1);
     return true;
   }
   return true;
@@ -834,6 +851,11 @@ function onKey(e: KeyboardEvent): void {
   const code = e.keyCode;
   if (satKey(code)) {
     e.preventDefault();
+    return;
+  }
+  if (isPlaying() && (code === 38 || code === 40 || code === 427 || code === 428)) {
+    e.preventDefault();
+    zap(code === 38 || code === 427 ? -1 : 1);
     return;
   }
   if (playerKey(code)) {

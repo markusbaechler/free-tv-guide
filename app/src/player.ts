@@ -55,6 +55,21 @@ function loadPlayerBundle(): Promise<void> {
 
 const root = () => document.getElementById('player') as HTMLElement;
 
+/** ID des Senders, der gerade im Player läuft (null = Player zu) */
+export function currentPlayerChannel(): string | null {
+  const ch = channels[index];
+  return isPlaying() && ch ? ch.id : null;
+}
+
+/** Innerhalb des offenen Players auf einen anderen Sender der Liste wechseln. false = nicht in der Liste */
+export function switchPlayerChannel(channelId: string): boolean {
+  const i = channels.map((c) => c.id).indexOf(channelId);
+  if (i === -1 || !isPlaying()) return false;
+  index = i;
+  start();
+  return true;
+}
+
 export function isPlaying(): boolean {
   return !root().hidden;
 }
