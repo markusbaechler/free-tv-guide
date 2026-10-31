@@ -33,6 +33,18 @@ function regexList(v: unknown, file: string, field: string): RegExp[] {
   });
 }
 
+/** Reihenfolge der Favoriten (Standardansicht); alle IDs müssen Sender sein */
+export function loadFavorites(dir: string, channelIds: Set<string>): string[] {
+  const file = 'channels.yaml';
+  const doc = readYaml(dir, file);
+  const fav: unknown = doc?.favorites ?? [];
+  if (!Array.isArray(fav)) fail(file, 'favorites muss eine Liste sein');
+  const out = fav.map(String);
+  for (const id of out) if (!channelIds.has(id)) fail(file, `favorites: unbekannter Sender ${id}`);
+  if (new Set(out).size !== out.length) fail(file, 'favorites: doppelter Eintrag');
+  return out;
+}
+
 export function loadChannels(dir: string): Channel[] {
   const file = 'channels.yaml';
   const doc = readYaml(dir, file);

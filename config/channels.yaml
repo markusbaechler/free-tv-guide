@@ -11,6 +11,9 @@
 #           zattoo = Zattoo-App (Zattoo Free: Werbung beim Umschalten, 10 h/Monat am TV) – nur wenn es nichts anderes gibt
 # deeplink: Startparameter für die externe App (PAYLOAD); Joyn/Zattoo kennen keinen (SPEC.md 4.5a). null = nur App öffnen
 # verified: false = Empfang über den ersten Weg noch nicht am TV geprüft
+# favorites: Reihenfolge im Abschnitt «Favoriten» (Standardansicht im Tab Sender) und Zapp-Reihenfolge im Player
+
+favorites: [srf1, srf2, srfinfo, daserste, zdf, rtl, sat1, prosieben, vox, rtlzwei, kabeleins, eurosport1, sport1, 3sat, rts1, rts2, rsila1, rsila2, arte, phoenix, zdfneo, zdfinfo, dmax]
 
 channels:
   # --- SRG: SRG-API in der App (läuft, 1080p), Sat als Reserve (Sat Access, meist verschlüsselt)
@@ -134,6 +137,10 @@ channels:
   - { id: vox,       name: "VOX",        country: DE, epg: null, sources: [{ kind: sat, names: ["VOX"] }, joyn], deeplink: null, verified: false }
   - { id: kabeleins, name: "kabel eins", country: DE, epg: null, sources: [{ kind: sat, names: ["kabel eins", "Kabel 1", "KABEL EINS"] }, joyn], deeplink: null, verified: false }
   - { id: rtlzwei,   name: "RTL Zwei",   country: DE, epg: null, sources: [{ kind: sat, names: ["RTLZWEI", "RTL ZWEI", "RTL2", "RTL II"] }, joyn], deeplink: null, verified: false }
+  # Sport- und Spartensender: über Astra frei in SD (unverifiziert), Internet nur mit Abo → Sat, sonst Zattoo
+  - { id: eurosport1, name: "Eurosport 1", country: DE, epg: null, sources: [{ kind: sat, names: ["Eurosport 1 Deutschland", "Eurosport 1", "Eurosport", "EUROSPORT 1"] }, zattoo], deeplink: null, verified: false }
+  - { id: sport1,     name: "Sport1",      country: DE, epg: null, sources: [{ kind: sat, names: ["SPORT1", "Sport1", "SPORT 1"] }, zattoo], deeplink: null, verified: false }
+  - { id: dmax,       name: "DMAX",        country: DE, epg: null, sources: [{ kind: sat, names: ["DMAX", "DMAX Deutschland"] }, zattoo], deeplink: null, verified: false }
 
   # --- Österreich: ORF auf Sat verschlüsselt (nur AT-Karte), Internet geoblockt → Sat-Versuch, dann Zattoo
   - { id: orf1,     name: "ORF 1",    country: AT, epg: null, sources: [{ kind: sat, names: ["ORF1 HD", "ORF 1 HD", "ORF1", "ORF 1"] }, zattoo], deeplink: null, verified: false }

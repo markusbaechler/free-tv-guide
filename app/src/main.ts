@@ -335,8 +335,7 @@ function refreshTunerEpg(): void {
 
 /** Zuordnete Sat-Sender in Listenreihenfolge (für Hoch/Runter im Sichtmodus) */
 function satChannels(): Channel[] {
-  const list = state.data ? state.data.channels : [];
-  return list.filter((c) => {
+  return orderedChannels().filter((c) => {
     const w = firstWay(c);
     return !!w && w.kind === 'sat';
   });
@@ -403,19 +402,41 @@ function renderLive(main: HTMLElement, now: Date): void {
     });
   }
 
-  const srg = state.data ? state.data.channels.filter((c) => c.epg) : [];
-  if (srg.length) {
+  // Favoriten mit Programmdaten (SRG-API oder Sat-Signal)
+  const withEpg = orderedChannels().filter((c) => {
+    const e = epgFor(c);
+    return !!e && e.length > 0;
+  });
+  if (withEpg.length) {
     box.appendChild(h('h2', { class: 'section-head' }, 'Jetzt im Programm'));
-    box.appendChild(h('div', { class: 'tiles' }, srg.map((c) => channelTile(c, now))));
+    box.appendChild(h('div', { class: 'tiles' }, withEpg.map((c) => channelTile(c, now))));
   }
   main.appendChild(box);
 }
 
 // ---------------------------------------------------------------- Tab «Sender»
 
+/** Sender in Favoriten-Reihenfolge, danach die übrigen in Listenreihenfolge */
+function orderedChannels(): Channel[] {
+  const list = state.data ? state.data.channels : [];
+  const fav = state.data ? state.data.favorites || [] : [];
+  const byId: Record<string, Channel> = {};
+  for (const c of list) byId[c.id] = c;
+  const out: Channel[] = [];
+  for (const id of fav) if (byId[id]) out.push(byId[id]!);
+  for (const c of list) if (fav.indexOf(c.id) === -1) out.push(c);
+  return out;
+}
+
 function renderChannels(main: HTMLElement, now: Date): void {
   const list = state.data ? state.data.channels : [];
   const box = h('div', { class: 'channels-view', 'data-scroll': true, 'data-nav-group': 'channels' });
+  const favIds = state.data ? state.data.favorites || [] : [];
+  const favs = favIds.map((id) => channelById(id)).filter((c): c is Channel => !!c);
+  if (favs.length) {
+    box.appendChild(h('h2', { class: 'section-head' }, 'Favoriten'));
+    box.appendChild(h('div', { class: 'tiles' }, favs.map((c) => channelTile(c, now))));
+  }
   const countries: Array<[string, string]> = [['CH', 'Schweiz'], ['DE', 'Deutschland'], ['AT', 'Österreich']];
   for (const [code, label] of countries) {
     const cs = list.filter((c) => c.country === code);
@@ -587,8 +608,7 @@ let pendingLaunch: { app: PlayerApp; deeplink: string | null } | null = null;
 /** Sender, die die App selbst abspielt (SRG-URN oder offizieller Livestream), in Listen-Reihenfolge (Hoch/Runter im Player) */
 function playableChannels(): PlayableChannel[] {
   const now = new Date();
-  const list = state.data ? state.data.channels : [];
-  return list
+  return orderedChannels()
     .filter((c) => isLive(c))
     .map((c) => {
       const nn = state.data ? nowNext(state.data.epg[c.id], now) : { now: null, next: null };

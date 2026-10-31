@@ -17,6 +17,8 @@ export interface Meta {
 export interface GuideData {
   events: GuideEvent[];
   channels: Channel[];
+  /** Sender-IDs in Favoriten-Reihenfolge (channels.yaml) */
+  favorites: string[];
   epg: Record<string, EpgEntry[]>;
   meta: Meta;
   /** Zeitpunkt, an dem die App die Daten erfolgreich geladen hat */
@@ -63,7 +65,7 @@ export function loadData(): Promise<GuideData | null> {
   if (embedded) return Promise.resolve(Object.assign({ loadedAt: new Date().toISOString(), fromCache: false }, embedded));
   return Promise.all([
     getJson<{ events: GuideEvent[] }>('events.json'),
-    getJson<{ channels: Channel[] }>('channels.json'),
+    getJson<{ channels: Channel[]; favorites?: string[] }>('channels.json'),
     getJson<{ channels: Record<string, EpgEntry[]> }>('epg.json'),
     getJson<Meta>('meta.json'),
   ])
@@ -71,6 +73,7 @@ export function loadData(): Promise<GuideData | null> {
       const d: GuideData = {
         events: ev.events,
         channels: ch.channels,
+        favorites: ch.favorites || [],
         epg: epg.channels,
         meta,
         loadedAt: new Date().toISOString(),

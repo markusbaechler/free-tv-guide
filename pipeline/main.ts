@@ -4,7 +4,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadChannels, loadManualEvents, loadRights, loadRules } from './config.ts';
+import { loadChannels, loadFavorites, loadManualEvents, loadRights, loadRules } from './config.ts';
 import { classify, isUnclassifiedSport } from './classify.ts';
 import { buildEvent, checkRights } from './rights.ts';
 import { extractPrograms, fetchDay, fillEndTimes, getToken, normalizeProgram, shapeOf, SrgError } from './sources/srg.ts';
@@ -260,7 +260,7 @@ async function main(): Promise<void> {
   };
 
   writeJson('events.json', { generatedAt: nowIso, events: eventList });
-  writeJson('channels.json', { generatedAt: nowIso, channels });
+  writeJson('channels.json', { generatedAt: nowIso, favorites: loadFavorites(CONFIG_DIR, new Set(channels.map((c) => c.id))), channels });
   writeJson('epg.json', { generatedAt: nowIso, channels: epg });
   writeJson('meta.json', meta);
   writeJson('debug/unclassified.json', unclassified);
