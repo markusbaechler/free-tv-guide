@@ -8,6 +8,10 @@ import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_M
 import { isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
 
+/** Wird beim Build aus config.xml gesetzt */
+declare const __APP_VERSION__: string;
+const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
+
 type Tab = 'live' | 'sport' | 'channels';
 
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -63,7 +67,9 @@ function renderStatus(): void {
   const d = state.data;
   if (d) {
     const stand = 'Stand ' + time(d.meta.generatedAt);
-    el.appendChild(h('span', { class: 'status__data' + (d.fromCache ? ' is-offline' : '') }, d.fromCache ? 'Offline · ' + stand : stand));
+    el.appendChild(h('span', { class: 'status__data' + (d.fromCache ? ' is-offline' : '') }, (d.fromCache ? 'Offline · ' + stand : stand) + ' · v' + APP_VERSION));
+  } else {
+    el.appendChild(h('span', { class: 'status__data' }, 'v' + APP_VERSION));
   }
 }
 
