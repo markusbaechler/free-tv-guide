@@ -7,7 +7,7 @@ import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, typ
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
 import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
-import { satEvents } from './satsport.ts';
+import { satEvents, unclassifiedSportTitles } from './satsport.ts';
 import { hideTvWindow, lastEpgSample, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
@@ -324,7 +324,7 @@ function refreshTunerEpg(): void {
   const next = () => {
     const id = ids.shift();
     if (!id) return;
-    tunerEpg(t.matched[id]!, 36).then(
+    tunerEpg(t.matched[id]!, 7 * 24).then(
       (entries) => {
         t.epg[id] = { fetchedAt: Date.now(), entries };
         rebuildSatEvents();
@@ -673,6 +673,16 @@ function renderTunerProbe(box: HTMLElement): void {
         ' · Regeln: ' + (state.data && state.data.rules ? 'ja' : 'nein'),
     ),
   );
+  if (state.data && state.data.rules) {
+    const hints: string[] = [];
+    let total = 0;
+    for (const id of Object.keys(t.epg)) {
+      const entries = t.epg[id]!.entries;
+      total += entries.length;
+      if (!state.data.epg[id]) hints.push(...unclassifiedSportTitles(state.data.rules, entries).map((x) => channelName(id) + ': ' + x));
+    }
+    box.appendChild(h('p', { class: 'note' }, 'Sat-EPG-Einträge: ' + total + ' · Sport ohne Wettbewerb: ' + hints.length + (hints.length ? ' – ' + hints.slice(0, 6).join(' · ') : '')));
+  }
   box.appendChild(
     h('p', { class: 'note' }, 'EPG-Rohdaten: ' + (lastEpgSample || '–') + (t.epgError ? ' · Fehler: ' + t.epgError : '')),
   );

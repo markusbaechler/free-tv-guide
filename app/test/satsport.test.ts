@@ -17,6 +17,7 @@ const json: RulesJson = {
   highlights: src(rules.highlights),
   replay: src(rules.replay),
   competitions: rules.competitions.map((r) => ({ id: r.id, patterns: src(r.patterns), requireAny: src(r.requireAny) })),
+  sportHints: src(rules.sportHints),
   rights: {},
 };
 for (const [id, r] of rights) json.rights[id] = { name: r.name, sport: r.sport, reception: r.reception };
@@ -35,6 +36,14 @@ test('Sat-EPG: Sport wird mit den Pipeline-Regeln erkannt, ohne Senderrechte-PrÃ
   assert.equal(events[0]!.channel, 'sat1');
   assert.equal(events[0]!.source, 'sat-epg');
   assert.equal(events[1]!.kind, 'highlights');
+});
+
+test('Gruppierung: Sat-Events werden nicht mit anderen Sendern zusammengelegt', async () => {
+  const { groupEvents } = await import('../src/group.ts');
+  const a = satEvents(json, 'daserste', [{ title: 'Sportschau Bundesliga', subtitle: null, start: '2026-10-31T19:15:00.000Z', end: '2026-10-31T21:25:00.000Z' }])[0]!;
+  const b = satEvents(json, 'sport1', [{ title: 'Bundesliga Pur', subtitle: 'Der Tag', start: '2026-10-31T19:25:00.000Z', end: '2026-10-31T21:00:00.000Z' }])[0]!;
+  const groups = groupEvents([a, b], ['srf2']);
+  assert.equal(groups.length, 2);
 });
 
 test('Sat-EPG: Eurosport-Motorsport wird erkannt, obwohl der Sender in rights.yaml nicht steht', () => {

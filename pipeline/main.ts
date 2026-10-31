@@ -268,6 +268,7 @@ async function main(): Promise<void> {
     highlights: src(rules.highlights),
     replay: src(rules.replay),
     competitions: rules.competitions.map((r) => ({ id: r.id, patterns: src(r.patterns), requireAny: src(r.requireAny) })),
+    sportHints: src(rules.sportHints),
     rights: {},
   };
   for (const [id, r] of rights) rulesJson.rights[id] = { name: r.name, sport: r.sport, reception: r.reception };

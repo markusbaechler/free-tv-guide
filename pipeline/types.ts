@@ -106,6 +106,8 @@ export interface RulesJson {
   highlights: string[];
   replay: string[];
   competitions: Array<{ id: string; patterns: string[]; requireAny: string[] }>;
+  /** Muster mit Sportbezug (Diagnose: Sendungen, die Sport sind, aber keinem Wettbewerb zugeordnet wurden) */
+  sportHints: string[];
   rights: Record<string, { name: string; sport: Sport; reception: Reception }>;
 }
 

@@ -36,6 +36,8 @@ export function groupEvents(events: GuideEvent[], priority: string[]): EventGrou
       if (t - new Date(first.start).getTime() > SAME_EVENT_WINDOW_MS) break;
       if (first.competition !== e.competition || first.kind !== e.kind) continue;
       if (g.members.some((m) => m.channel === e.channel)) continue;
+      // Zusammenlegen nur für SRG-Parallelausstrahlungen; Sat-Sender zeigen zur selben Zeit verschiedene Sendungen
+      if (first.source === 'sat-epg' || e.source === 'sat-epg') continue;
       target = g;
       break;
     }

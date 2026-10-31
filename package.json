@@ -14,7 +14,8 @@
     "app:build": "node app/build.mjs",
     "app:preview": "node app/build.mjs && node app/preview.mjs",
     "check": "npm run typecheck && npm test && npm run app:build",
-    "app:standalone": "node app/build.mjs && node app/build-preview.mjs out out/free-tv-guide-vorschau.html"
+    "app:standalone": "node app/build.mjs && node app/build-preview.mjs out out/free-tv-guide-vorschau.html",
+    "app:test-tv": "node app/test-tv/run.mjs"
   },
   "dependencies": {
     "@srgssr/pillarbox-web": "^1.40.4",
