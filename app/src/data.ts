@@ -1,4 +1,4 @@
-import type { Channel, GuideEvent } from '../../pipeline/types.ts';
+import type { Channel, GuideEvent, RulesJson } from '../../pipeline/types.ts';
 import { DATA_BASE } from './settings.ts';
 
 export interface EpgEntry {
@@ -19,6 +19,8 @@ export interface GuideData {
   channels: Channel[];
   /** Sender-IDs in Favoriten-Reihenfolge (channels.yaml) */
   favorites: string[];
+  /** Regeln für die Sport-Erkennung in der App (Sat-EPG); null = nicht geladen */
+  rules: RulesJson | null;
   epg: Record<string, EpgEntry[]>;
   meta: Meta;
   /** Zeitpunkt, an dem die App die Daten erfolgreich geladen hat */
@@ -68,12 +70,14 @@ export function loadData(): Promise<GuideData | null> {
     getJson<{ channels: Channel[]; favorites?: string[] }>('channels.json'),
     getJson<{ channels: Record<string, EpgEntry[]> }>('epg.json'),
     getJson<Meta>('meta.json'),
+    getJson<RulesJson>('rules.json').catch(() => null),
   ])
-    .then(([ev, ch, epg, meta]) => {
+    .then(([ev, ch, epg, meta, rules]) => {
       const d: GuideData = {
         events: ev.events,
         channels: ch.channels,
         favorites: ch.favorites || [],
+        rules,
         epg: epg.channels,
         meta,
         loadedAt: new Date().toISOString(),

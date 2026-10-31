@@ -7,6 +7,7 @@ import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, typ
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
 import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
+import { satEvents } from './satsport.ts';
 import { hideTvWindow, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
@@ -38,6 +39,8 @@ const state = {
     error: null as string | null,
     matched: {} as Record<string, TunerChannel>,
     epg: {} as Record<string, { fetchedAt: number; entries: TunerEpgEntry[] }>,
+    /** Sport-Events aus dem Sat-Programm (klassifiziert mit rules.json) */
+    events: [] as GuideEvent[],
     current: null as string | null,
   },
 };
@@ -56,7 +59,9 @@ const channelName = (id: string) => {
 };
 
 function groups(): EventGroup[] {
-  return state.data ? groupEvents(state.data.events, CHANNEL_PRIORITY) : [];
+  if (!state.data) return [];
+  const events = state.tuner.events.length ? state.data.events.concat(state.tuner.events) : state.data.events;
+  return groupEvents(events, CHANNEL_PRIORITY);
 }
 
 // ---------------------------------------------------------------- Kopfzeile
@@ -321,7 +326,8 @@ function refreshTunerEpg(): void {
     tunerEpg(t.matched[id]!, 12).then(
       (entries) => {
         t.epg[id] = { fetchedAt: Date.now(), entries };
-        if (!isPlaying() && !state.overlay) render();
+        rebuildSatEvents();
+        if (!isPlaying() && !state.overlay && !t.tvOpen) render();
         next();
       },
       () => {
@@ -426,6 +432,19 @@ function zapList(): Channel[] {
     const w = firstWay(c);
     return !!w && w.kind !== 'ext';
   });
+}
+
+/** Sport-Events aus allen geladenen Sat-Programmen neu ableiten (nur Sender ohne Pipeline-EPG) */
+function rebuildSatEvents(): void {
+  const d = state.data;
+  if (!d || !d.rules) return;
+  const out: GuideEvent[] = [];
+  for (const id of Object.keys(state.tuner.epg)) {
+    if (d.epg[id]) continue;
+    const entries = state.tuner.epg[id]!.entries;
+    if (entries.length) out.push(...satEvents(d.rules, id, entries));
+  }
+  state.tuner.events = out;
 }
 
 /** Zuletzt angesteuerter Sender beim Zappen (sofort gesetzt, nicht erst nach erfolgreichem Umschalten) */

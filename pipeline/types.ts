@@ -97,7 +97,16 @@ export interface GuideEvent {
   end: string;
   channel: string;
   reception: Reception;
-  source: 'srg-epg' | 'manual';
+  source: 'srg-epg' | 'manual' | 'sat-epg';
+}
+
+/** Regeln und Wettbewerbe für die App (rules.json): Regex als Quelltext, in der App mit Flags «iu» rekonstruiert */
+export interface RulesJson {
+  exclude: string[];
+  highlights: string[];
+  replay: string[];
+  competitions: Array<{ id: string; patterns: string[]; requireAny: string[] }>;
+  rights: Record<string, { name: string; sport: Sport; reception: Reception }>;
 }
 
 export interface Classification {

@@ -10,7 +10,7 @@ import { buildEvent, checkRights } from './rights.ts';
 import { extractPrograms, fetchDay, fillEndTimes, getToken, normalizeProgram, shapeOf, SrgError } from './sources/srg.ts';
 import { fetchLivestreams, matchChannel, type LiveStream } from './sources/srg-live.ts';
 import { addDays, zurichDate, zurichLocalToUtc } from './time.ts';
-import type { Channel, GuideEvent, Program } from './types.ts';
+import type { Channel, RulesJson, GuideEvent, Program } from './types.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CONFIG_DIR = join(ROOT, 'config');
@@ -261,6 +261,17 @@ async function main(): Promise<void> {
 
   writeJson('events.json', { generatedAt: nowIso, events: eventList });
   writeJson('channels.json', { generatedAt: nowIso, favorites: loadFavorites(CONFIG_DIR, new Set(channels.map((c) => c.id))), channels });
+  // Regeln für die Sport-Erkennung in der App (Programm aus dem Sat-Signal wird dort klassifiziert)
+  const src = (list: RegExp[]) => list.map((r) => r.source);
+  const rulesJson: RulesJson = {
+    exclude: src(rules.exclude),
+    highlights: src(rules.highlights),
+    replay: src(rules.replay),
+    competitions: rules.competitions.map((r) => ({ id: r.id, patterns: src(r.patterns), requireAny: src(r.requireAny) })),
+    rights: {},
+  };
+  for (const [id, r] of rights) rulesJson.rights[id] = { name: r.name, sport: r.sport, reception: r.reception };
+  writeJson('rules.json', rulesJson);
   writeJson('epg.json', { generatedAt: nowIso, channels: epg });
   writeJson('meta.json', meta);
   writeJson('debug/unclassified.json', unclassified);
