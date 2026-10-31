@@ -7,6 +7,7 @@ import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, typ
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
 import { isPlaying, openPlayer, playerKey, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
+import { hideTvWindow, listChannels, programNow, showTvWindow, tuneTo, tunerAvailable, videoSources, type TunerChannel } from './tuner.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
 declare const __APP_VERSION__: string;
@@ -28,6 +29,8 @@ const state = {
   data: null as GuideData | null,
   loading: true,
   overlay: null as null | 'watch' | 'exit',
+  /** Sat-Tuner-Probe */
+  tuner: { channels: [] as TunerChannel[], log: [] as string[], tvOpen: false },
 };
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
@@ -256,7 +259,101 @@ function renderChannels(main: HTMLElement, now: Date): void {
     box.appendChild(h('h2', { class: 'section-head' }, label));
     box.appendChild(h('div', { class: 'tiles' }, cs.map((c) => channelTile(c, now))));
   }
+  renderTunerProbe(box);
   main.appendChild(box);
+}
+
+// ---------------------------------------------------------------- Sat-Tuner (Probe)
+
+function tunerLog(line: string): void {
+  state.tuner.log = [line].concat(state.tuner.log).slice(0, 6);
+  render();
+}
+
+function renderTunerProbe(box: HTMLElement): void {
+  const t = state.tuner;
+  const avail = tunerAvailable();
+  box.appendChild(h('h2', { class: 'section-head' }, 'Sat-Tuner (Test)'));
+  box.appendChild(
+    h('p', { class: 'note' }, 'APIs: tvchannel ' + (avail.channel ? 'ja' : 'nein') + ' · tvwindow ' + (avail.window ? 'ja' : 'nein') + (t.channels.length ? ' · ' + t.channels.length + ' Sender gelesen' : '')),
+  );
+  box.appendChild(
+    h(
+      'div',
+      { class: 'tiles' },
+      h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:list' }, h('div', { class: 'tile__name' }, 'Senderliste lesen'), h('div', { class: 'tile__now tile__now--none' }, 'tizen.tvchannel.getChannelList')),
+      h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:sources' }, h('div', { class: 'tile__name' }, 'Videoquellen'), h('div', { class: 'tile__now tile__now--none' }, 'systeminfo VIDEOSOURCE')),
+      h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:show' }, h('div', { class: 'tile__name' }, 'TV-Bild zeigen'), h('div', { class: 'tile__now tile__now--none' }, 'aktueller Tuner-Sender, Zurück = schliessen')),
+    ),
+  );
+  for (const line of t.log) box.appendChild(h('p', { class: 'note' }, line));
+  if (t.channels.length) {
+    box.appendChild(h('h2', { class: 'section-head' }, 'Tuner-Sender (OK = umschalten)'));
+    box.appendChild(
+      h(
+        'div',
+        { class: 'tiles' },
+        t.channels.slice(0, 60).map((c) =>
+          h(
+            'div',
+            { class: 'tile', 'data-nav': true, 'data-key': 'tuner:ch:' + c.index },
+            h('div', { class: 'tile__name' }, (c.major !== null ? c.major + (c.minor ? '-' + c.minor : '') + '  ' : '') + c.name),
+            h('div', { class: 'tile__now tile__now--none' }, JSON.stringify(c.raw).slice(0, 90)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+function tunerAction(key: string): void {
+  if (key === 'tuner:list') {
+    listChannels().then(
+      (list) => {
+        state.tuner.channels = list;
+        tunerLog('Senderliste: ' + list.length + ' Einträge' + (list[0] ? ' · erster: ' + JSON.stringify(list[0].raw).slice(0, 160) : ''));
+      },
+      (e: Error) => tunerLog('Fehler ' + e.message),
+    );
+    return;
+  }
+  if (key === 'tuner:sources') {
+    videoSources().then((s) => tunerLog('Quellen: ' + s), (e: Error) => tunerLog('Fehler ' + e.message));
+    return;
+  }
+  if (key === 'tuner:show') {
+    openTvWindow();
+    return;
+  }
+  if (key.indexOf('tuner:ch:') === 0) {
+    const ch = state.tuner.channels[Number(key.slice(9))];
+    if (!ch) return;
+    tuneTo(ch).then(
+      (r) => {
+        tunerLog('Tune ' + ch.name + ': ' + r);
+        programNow(ch).then((p) => tunerLog('EPG ' + ch.name + ': ' + p), (e: Error) => tunerLog('EPG-Fehler ' + e.message));
+        openTvWindow();
+      },
+      (e: Error) => tunerLog('Fehler ' + e.message),
+    );
+  }
+}
+
+function openTvWindow(): void {
+  showTvWindow().then(
+    (r) => {
+      state.tuner.tvOpen = true;
+      tunerLog('TV-Bild: ' + r);
+    },
+    (e: Error) => tunerLog('Fehler ' + e.message),
+  );
+}
+
+function closeTvWindow(): void {
+  hideTvWindow().then(() => {
+    state.tuner.tvOpen = false;
+    tunerLog('TV-Bild geschlossen');
+  });
 }
 
 // ---------------------------------------------------------------- Rendern
@@ -490,9 +587,11 @@ function activate(el: HTMLElement): void {
     return;
   }
   if (key === 'reload') return refresh();
+  if (kind === 'tuner') return tunerAction(key);
 }
 
 function back(): void {
+  if (state.tuner.tvOpen) return closeTvWindow();
   if (state.overlay) return closeOverlay();
   const f = getFocused();
   const inTabs = f && f.closest('#tabs');
