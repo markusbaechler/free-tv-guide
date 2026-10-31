@@ -8,7 +8,7 @@ import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_M
 import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, launchApp, registerKeys } from './tizen.ts';
 import { satEvents } from './satsport.ts';
-import { hideTvWindow, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
+import { hideTvWindow, lastEpgSample, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
 declare const __APP_VERSION__: string;
@@ -41,6 +41,7 @@ const state = {
     epg: {} as Record<string, { fetchedAt: number; entries: TunerEpgEntry[] }>,
     /** Sport-Events aus dem Sat-Programm (klassifiziert mit rules.json) */
     events: [] as GuideEvent[],
+    epgError: null as string | null,
     current: null as string | null,
   },
 };
@@ -330,8 +331,12 @@ function refreshTunerEpg(): void {
         if (!isPlaying() && !state.overlay && !t.tvOpen) render();
         next();
       },
-      () => {
+      (e: Error) => {
         t.epg[id] = { fetchedAt: Date.now(), entries: [] };
+        if (!t.epgError) {
+          t.epgError = e.message;
+          tunerLog('EPG-Fehler ' + id + ': ' + e.message);
+        }
         next();
       },
     );
@@ -667,6 +672,9 @@ function renderTunerProbe(box: HTMLElement): void {
         ' · Sport-Events aus Sat: ' + t.events.length +
         ' · Regeln: ' + (state.data && state.data.rules ? 'ja' : 'nein'),
     ),
+  );
+  box.appendChild(
+    h('p', { class: 'note' }, 'EPG-Rohdaten: ' + (lastEpgSample || '–') + (t.epgError ? ' · Fehler: ' + t.epgError : '')),
   );
   box.appendChild(
     h(

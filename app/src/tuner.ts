@@ -167,6 +167,8 @@ export interface TunerEpgEntry {
 }
 
 let cachedList: TunerChannel[] | null = null;
+/** Rohform des zuletzt gelesenen EPG-Eintrags (Diagnose) */
+export let lastEpgSample: string | null = null;
 let listPromise: Promise<TunerChannel[]> | null = null;
 
 /** Senderliste einmal lesen und behalten */
@@ -202,8 +204,24 @@ export function matchTunerChannel(list: TunerChannel[], names: string[]): TunerC
   return null;
 }
 
+/** Tizen liefert Zeiten als TZDate (eigener Typ ohne getTime): über die UTC-Getter in ein Date wandeln */
 function toIso(v: unknown): string | null {
   if (v instanceof Date) return isNaN(v.getTime()) ? null : v.toISOString();
+  if (v && typeof v === 'object') {
+    const t = v as { getUTCFullYear?: () => number; getUTCMonth?: () => number; getUTCDate?: () => number; getUTCHours?: () => number; getUTCMinutes?: () => number; getUTCSeconds?: () => number; toString?: () => string };
+    if (typeof t.getUTCFullYear === 'function') {
+      try {
+        const d = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth!(), t.getUTCDate!(), t.getUTCHours!(), t.getUTCMinutes!(), t.getUTCSeconds!()));
+        return isNaN(d.getTime()) ? null : d.toISOString();
+      } catch (e) {
+        // fällt auf toString zurück
+      }
+    }
+    if (typeof t.toString === 'function') {
+      const d = new Date(String(t));
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+  }
   if (typeof v === 'string' || typeof v === 'number') {
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d.toISOString();
@@ -222,6 +240,7 @@ export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry
         new Date(),
         (list) => {
           const out: TunerEpgEntry[] = [];
+          lastEpgSample = list.length ? JSON.stringify(list[0], (k, val) => (val && typeof val === 'object' && typeof (val as { getUTCFullYear?: unknown }).getUTCFullYear === 'function' ? String(val) : val)).slice(0, 220) : 'leer';
           for (const p of list) {
             const start = toIso(p.startTime);
             if (!start) continue;
