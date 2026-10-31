@@ -15,8 +15,20 @@ channels:
   - { id: rts2,     name: "RTS 2",      country: CH, epg: "srg:rts:rts-2", app: srg, zattoo: { slot: null, deeplink: null }, verified: false }
   - { id: rsila1,   name: "RSI LA 1",   country: CH, epg: "srg:rsi:la-1", app: srg, zattoo: { slot: null, deeplink: null }, verified: false }
   - { id: rsila2,   name: "RSI LA 2",   country: CH, epg: "srg:rsi:la-2", app: srg, zattoo: { slot: null, deeplink: null }, verified: false }
-  - { id: tv24,     name: "TV24",       country: CH, epg: null, app: zattoo, zattoo: { slot: null, deeplink: null }, verified: false }
+  # CH-Media-Sender: laut Joyn Schweiz enthalten (3+ bestätigt, übrige unverifiziert)
   - { id: 3plus,    name: "3+",         country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: 4plus,    name: "4+",         country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: 5plus,    name: "5+",         country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: tv24,     name: "TV24",       country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: tv25,     name: "TV25",       country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: telezueri, name: "TeleZüri",  country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: telebaern, name: "TeleBärn",  country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: telem1,   name: "Tele M1",    country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: tele1,    name: "Tele 1",     country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: tvo,      name: "TVO",        country: CH, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
+  # Übrige Regionalsender: nur Zattoo
+  - { id: telebasel, name: "TeleBasel", country: CH, epg: null, app: zattoo, zattoo: { slot: null, deeplink: null }, verified: false }
+  - { id: teletop,  name: "TeleTop",    country: CH, epg: null, app: zattoo, zattoo: { slot: null, deeplink: null }, verified: false }
   - { id: bluezoom, name: "blue Zoom",  country: CH, epg: null, app: zattoo, zattoo: { slot: null, deeplink: null }, verified: false }
   - { id: daserste, name: "Das Erste",  country: DE, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }
   - { id: zdf,      name: "ZDF",        country: DE, epg: null, app: joyn, zattoo: { slot: null, deeplink: null }, verified: false }

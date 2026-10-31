@@ -11,8 +11,8 @@ export const REFRESH_VIEW_MS = 60 * 1000;
 export const CHANNEL_PRIORITY = ['srf2', 'srf1', 'srfinfo', 'rts2', 'rts1', 'rsila2', 'rsila1'];
 
 /**
- * Wiedergabe-Apps. Die Tizen-App-IDs werden in Phase 4 am TV ermittelt
- * (sdb shell 0 vd_applist) und hier eingetragen. null = noch nicht verknüpft.
+ * Wiedergabe-Apps. Tizen-App-IDs am QE75Q70R ausgelesen (Apps2Samsung, 31.10.2026).
+ * null = noch nicht verknüpft.
  */
 export interface PlayerApp {
   name: string;
@@ -21,8 +21,8 @@ export interface PlayerApp {
 
 /** Externe Apps für Sender ohne SRG-Livestream. SRG-Sender spielt die App selbst ab. */
 export const PLAYERS: { joyn: PlayerApp; zattoo: PlayerApp } = {
-  joyn: { name: 'Joyn', tizenId: null },
-  zattoo: { name: 'Zattoo', tizenId: null },
+  joyn: { name: 'Joyn', tizenId: '2200MKoe7c.ZAPPNTV' },
+  zattoo: { name: 'Zattoo', tizenId: 'QZf9YjXnoV.Zattoo' },
 };
 
 /** Hinweis im Dialog, je nach App */
