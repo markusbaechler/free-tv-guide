@@ -19,6 +19,17 @@ function create(elementId: string): PlayerHandle {
     autoplay: true,
     muted: false,
     fill: true,
+    html5: {
+      vhs: {
+        useForcedSubtitles: true,
+        overrideNative: true,
+        // Hohe Start-Bandbreitenschätzung: sofort die höchste Stufe statt mit 360p zu beginnen
+        // (gemessene Bandbreite wird danach gemerkt; localStorage-Zugriffe sind in VHS abgesichert)
+        bandwidth: 20000000,
+        useBandwidthFromLocalStorage: true,
+        limitRenditionByPlayerDimensions: false,
+      },
+    },
   });
   return {
     play(urn: string) {

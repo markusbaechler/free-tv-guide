@@ -23,6 +23,7 @@ let handle: PlayerHandle | null = null;
 let channels: PlayableChannel[] = [];
 let index = 0;
 let infoTimer: number | null = null;
+let qualityTimer: number | null = null;
 let onClose: (() => void) | null = null;
 
 function loadPlayerBundle(): Promise<void> {
@@ -60,13 +61,25 @@ function showInfo(text: string | null, persistent: boolean): void {
     if (ch.nowTitle) info.appendChild(h('div', { class: 'pinfo__now' }, ch.nowTitle));
   }
   if (text) info.appendChild(h('div', { class: 'pinfo__msg' }, text));
-  // Bildgrösse des Streams (zur Beurteilung der Qualität; die Stufe wählt der Player nach Bandbreite)
-  const q = handle ? handle.quality() : null;
-  if (q) info.appendChild(h('div', { class: 'pinfo__msg' }, 'Bild: ' + q));
+  // Bildgrösse des Streams, laufend aktualisiert (die Stufe wählt der Player nach Bandbreite)
+  const qualityEl = h('div', { class: 'pinfo__msg' });
+  info.appendChild(qualityEl);
   info.appendChild(h('div', { class: 'pinfo__keys' }, 'Hoch/Runter: Sender wechseln · OK: Info · Zurück: Guide'));
   info.hidden = false;
   if (infoTimer !== null) window.clearTimeout(infoTimer);
-  infoTimer = persistent ? null : window.setTimeout(() => (info.hidden = true), 5000);
+  if (qualityTimer !== null) window.clearInterval(qualityTimer);
+  const updateQuality = () => {
+    const q = handle ? handle.quality() : null;
+    qualityEl.textContent = q ? 'Bild: ' + q : '';
+  };
+  updateQuality();
+  qualityTimer = window.setInterval(updateQuality, 1000);
+  const hide = () => {
+    info.hidden = true;
+    if (qualityTimer !== null) window.clearInterval(qualityTimer);
+    qualityTimer = null;
+  };
+  infoTimer = persistent ? null : window.setTimeout(hide, 8000);
 }
 
 function start(): void {
@@ -114,6 +127,8 @@ export function closePlayer(): void {
   clear(el);
   el.hidden = true;
   if (infoTimer !== null) window.clearTimeout(infoTimer);
+  if (qualityTimer !== null) window.clearInterval(qualityTimer);
+  qualityTimer = null;
   const cb = onClose;
   onClose = null;
   if (cb) cb();
