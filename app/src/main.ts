@@ -1142,6 +1142,8 @@ function start(): void {
   registerKeys();
   // Tastenlogger (Diagnose): welche Tasten der Fernbedienung erreichen die App, mit welchem Code
   document.addEventListener('keydown', (e) => {
+    // Navigationstasten nicht mitschreiben, sonst verdrängen sie die Probetasten
+    if (e.keyCode === 37 || e.keyCode === 38 || e.keyCode === 39 || e.keyCode === 40 || e.keyCode === 13 || e.keyCode === 10009 || e.keyCode === 8) return;
     keyLog.unshift((e.key && e.key !== 'Unidentified' ? e.key : '?') + '=' + e.keyCode + (state.tuner.tvOpen ? '(Sat)' : isPlaying() ? '(Stream)' : ''));
     if (keyLog.length > 12) keyLog.length = 12;
     const el = document.getElementById('key-log');

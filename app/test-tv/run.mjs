@@ -104,10 +104,11 @@ console.log('Tastenlogger:');
 await page.click('[data-key="tab:channels"]');
 await page.waitForTimeout(300);
 await page.keyboard.press('ArrowLeft');
+await page.keyboard.press('Digit5');
 await page.keyboard.press('ArrowRight');
 await page.waitForTimeout(300);
 const keys = await page.evaluate(() => Array.from(document.querySelectorAll('.channels-view .note')).map((n) => n.innerText).filter((x) => /^Tasten/.test(x)).join(''));
-check(/ArrowRight=39/.test(keys) && /ArrowLeft=37/.test(keys), 'Tastenlogger zeigt Taste=Code: ' + keys.slice(0, 80));
+check(/5=53/.test(keys) && !/Arrow/.test(keys), 'Tastenlogger zeigt Probetasten, keine Pfeile: ' + keys.slice(0, 80));
 
 console.log('Sat-Sichtmodus und Zappen:');
 await page.click('[data-key="tab:channels"]');
