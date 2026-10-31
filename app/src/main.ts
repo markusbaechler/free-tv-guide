@@ -323,7 +323,7 @@ function refreshTunerEpg(): void {
   const next = () => {
     const id = ids.shift();
     if (!id) return;
-    tunerEpg(t.matched[id]!, 12).then(
+    tunerEpg(t.matched[id]!, 36).then(
       (entries) => {
         t.epg[id] = { fetchedAt: Date.now(), entries };
         rebuildSatEvents();
