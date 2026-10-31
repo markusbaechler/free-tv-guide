@@ -657,7 +657,16 @@ function renderTunerProbe(box: HTMLElement): void {
   const avail = tunerAvailable();
   box.appendChild(h('h2', { class: 'section-head' }, 'Tuner-Diagnose'));
   box.appendChild(
-    h('p', { class: 'note' }, 'APIs: tvchannel ' + (avail.channel ? 'ja' : 'nein') + ' · tvwindow ' + (avail.window ? 'ja' : 'nein') + (t.channels.length ? ' · ' + t.channels.length + ' Sender gelesen' : '')),
+    h(
+      'p',
+      { class: 'note' },
+      'APIs: tvchannel ' + (avail.channel ? 'ja' : 'nein') + ' · tvwindow ' + (avail.window ? 'ja' : 'nein') +
+        (t.channels.length ? ' · ' + t.channels.length + ' Sender gelesen' : '') +
+        ' · zugeordnet ' + Object.keys(t.matched).length +
+        ' · Programm von ' + Object.keys(t.epg).filter((id) => t.epg[id]!.entries.length > 0).length + ' Sat-Sendern' +
+        ' · Sport-Events aus Sat: ' + t.events.length +
+        ' · Regeln: ' + (state.data && state.data.rules ? 'ja' : 'nein'),
+    ),
   );
   box.appendChild(
     h(

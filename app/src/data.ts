@@ -37,7 +37,10 @@ function dataBase(): string {
 }
 
 function getJson<T>(file: string): Promise<T> {
-  return fetch(dataBase() + file, { cache: 'no-cache' }).then((res) => {
+  // Chromium 63 kennt die fetch-Option «cache» nicht und bedient aus dem Zwischenspeicher → Zeitstempel in der Adresse
+  const base = dataBase() + file;
+  const url = base + (base.indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
+  return fetch(url, { cache: 'no-cache' }).then((res) => {
     if (!res.ok) throw new Error(file + ': HTTP ' + res.status);
     return res.json() as Promise<T>;
   });
