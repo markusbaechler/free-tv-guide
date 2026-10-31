@@ -257,7 +257,9 @@ export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry
         tzDate(t, new Date()) as Date,
         (list) => {
           const out: TunerEpgEntry[] = [];
-          lastEpgSample = list.length ? JSON.stringify(list[0], (k, val) => (val && typeof val === 'object' && typeof (val as { getUTCFullYear?: unknown }).getUTCFullYear === 'function' ? String(val) : val)).slice(0, 220) : 'leer';
+          if (list.length || !lastEpgSample) {
+            lastEpgSample = list.length ? JSON.stringify(list[0], (k, val) => (val && typeof val === 'object' && typeof (val as { getUTCFullYear?: unknown }).getUTCFullYear === 'function' ? String(val) : val)).slice(0, 220) : 'leer';
+          }
           for (const p of list) {
             const start = toIso(p.startTime);
             if (!start) continue;
@@ -266,6 +268,13 @@ export function tunerEpg(ch: TunerChannel, hours: number): Promise<TunerEpgEntry
             out.push({ title: str(p.title) || 'Ohne Titel', subtitle: str(p.detailedDescription).slice(0, 120) || null, start, end });
           }
           out.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
+          // Fehlende Endzeit = Beginn der nächsten Sendung (wie in der Pipeline); letzte: +2 h
+          for (let i = 0; i < out.length; i++) {
+            const e = out[i]!;
+            if (e.end) continue;
+            const nxt = out[i + 1];
+            e.end = nxt ? nxt.start : new Date(new Date(e.start).getTime() + 2 * 3600 * 1000).toISOString();
+          }
           resolve(out);
         },
         (e) => reject(new Error('getProgramList: ' + e.message)),
