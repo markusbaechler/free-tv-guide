@@ -168,6 +168,10 @@ check(!st.sat && /Kein Sat-Signal/.test(st.overlay) && /Zattoo öffnen/.test(st.
 await page.keyboard.press('Backspace');
 await page.waitForTimeout(300);
 
+console.log('Diagnose-Zugang:');
+const diagObj = await page.evaluate(() => JSON.parse(JSON.stringify(window.ftgDiag())));
+check(diagObj.tuner.matched.length >= 15 && diagObj.tuner.events.length >= 4 && Object.keys(diagObj.epg).length >= 5, 'window.ftgDiag() liefert Zuordnung, EPG und Events: ' + diagObj.tuner.matched.length + ' / ' + Object.keys(diagObj.epg).length + ' / ' + diagObj.tuner.events.length);
+
 console.log('Zwischenspeicher:');
 const cacheRaw = await page.evaluate(() => { try { return localStorage.getItem('ftg:tuner:v1') || ''; } catch (e) { return ''; } });
 check(cacheRaw.length > 1000 && /_serviceId/.test(cacheRaw), 'Tuner-Zuordnung und EPG gespeichert (' + cacheRaw.length + ' Zeichen)');

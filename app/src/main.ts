@@ -1327,6 +1327,37 @@ function refresh(): void {
   });
 }
 
+/**
+ * Diagnose-Zugang für den Debug-Modus (Web Inspector über Apps2Samsung): liefert den inneren Zustand als
+ * einfaches Objekt – Zuordnung, EPG-Titel je Sat-Sender, gefundene Sport-Events, Tastenlog, Fehler.
+ */
+(window as unknown as { ftgDiag: () => unknown }).ftgDiag = () => {
+  const t = state.tuner;
+  const epg: Record<string, Array<[string, string, string | null]>> = {};
+  for (const id of Object.keys(t.epg)) epg[id] = t.epg[id]!.entries.map((e) => [e.start, e.title, e.subtitle] as [string, string, string | null]);
+  return {
+    version: APP_VERSION,
+    data: state.data ? { generatedAt: state.data.meta.generatedAt, fromCache: state.data.fromCache, rules: !!state.data.rules, channels: state.data.channels.length, favorites: state.data.favorites } : null,
+    tuner: {
+      loaded: t.loaded,
+      error: t.error,
+      epgError: t.epgError,
+      fromCache: t.fromCache,
+      channels: t.channels.length,
+      matched: Object.keys(t.matched).map((id) => ({ id, name: t.matched[id]!.name, major: t.matched[id]!.major, serviceId: t.matched[id]!.raw._serviceId })),
+      epgCounts: Object.keys(t.epg).map((id) => ({ id, n: t.epg[id]!.entries.length, fetchedAt: new Date(t.epg[id]!.fetchedAt).toISOString() })),
+      events: t.events.map((e) => ({ channel: e.channel, start: e.start, title: e.title, competition: e.competition, kind: e.kind })),
+      tvOpen: t.tvOpen,
+      current: t.current,
+      log: t.log,
+    },
+    epg,
+    keys: keyLog.slice(),
+    keyRegistration,
+    lastChannel,
+  };
+};
+
 function start(): void {
   registerKeys();
   // Tastenlogger (Diagnose): welche Tasten der Fernbedienung erreichen die App, mit welchem Code
