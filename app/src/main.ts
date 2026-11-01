@@ -411,6 +411,9 @@ const HARVEST_MAX_AGE_MS = 12 * 3600 * 1000;
 const HARVEST_RETRY_THIN_MS = 60 * 60 * 1000;
 /** Wartezeit je Transponder; im Fernseher-Simulator über window.__FTG_HARVEST_DWELL__ verkürzt */
 const HARVEST_DWELL_MS = Number((window as unknown as { __FTG_HARVEST_DWELL__?: number }).__FTG_HARVEST_DWELL__) || 10000;
+/** So lange keine Taste im Guide, dann darf eine abgebrochene Sammlung weiterlaufen */
+const HARVEST_IDLE_MS = 45 * 1000;
+let lastKeyAt = Date.now();
 
 function needsHarvest(id: string): boolean {
   const slot = state.tuner.epg[id];
@@ -1483,6 +1486,9 @@ function start(): void {
     const el = document.getElementById('key-log');
     if (el) el.textContent = 'Tasten (neueste zuerst): ' + keyLog.join('  ');
   });
+  document.addEventListener('keydown', () => {
+    lastKeyAt = Date.now();
+  });
   document.addEventListener('keydown', onKey);
   // Maus/Pointer in der Vorschau: Klick = Fokus + OK
   document.addEventListener('click', (e) => {
@@ -1509,6 +1515,8 @@ function start(): void {
     if (isPlaying() || state.tuner.tvOpen) return;
     if (!state.overlay) render();
     else renderStatus();
+    // Nach einem Abbruch (Zuschauer hat etwas angesehen): Sammlung fortsetzen, sobald der Guide eine Weile ruht
+    if (Date.now() - lastKeyAt > HARVEST_IDLE_MS) maybeHarvest(false);
   }, REFRESH_VIEW_MS);
   setInterval(() => {
     if (state.tuner.loaded && !state.tuner.tvOpen) refreshTunerEpg(() => maybeHarvest(false));
