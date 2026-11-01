@@ -8,6 +8,7 @@ import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_M
 import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, keyRegistration, launchApp, registerKeys } from './tizen.ts';
 import { satEvents, unclassifiedSportTitles } from './satsport.ts';
+import { findByServiceId, readTunerCache, writeTunerCache } from './tunercache.ts';
 import { hideTvWindow, lastEpgSample, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
@@ -42,6 +43,8 @@ const state = {
     /** Sport-Events aus dem Sat-Programm (klassifiziert mit rules.json) */
     events: [] as GuideEvent[],
     epgError: null as string | null,
+    /** Zuordnung/Programm stammen (noch) aus dem Zwischenspeicher */
+    fromCache: false,
     current: null as string | null,
   },
 };
@@ -250,7 +253,7 @@ function ways(c: Channel): Way[] {
       }
     } else if (s.kind === 'sat') {
       const m = state.tuner.matched[c.id];
-      if (m) out.push({ kind: 'sat', tuner: m });
+      if (m && !satFailedRecently(c.id)) out.push({ kind: 'sat', tuner: m });
     } else {
       out.push({ kind: 'ext', app: s.kind });
     }
@@ -288,24 +291,44 @@ function channelTile(c: Channel, now: Date): HTMLElement {
 
 // ---------------------------------------------------------------- Sat-Tuner: Zuordnung, Programm, Sichtmodus
 
-const TUNER_EPG_MAX_AGE_MS = 10 * 60 * 1000;
+const TUNER_EPG_MAX_AGE_MS = 60 * 60 * 1000;
 
 /** Tuner-Liste lesen, Sat-Sender zuordnen, Programm nachladen (nur am Fernseher) */
+let tunerCacheApplied = false;
+
 function ensureTuner(): void {
   const t = state.tuner;
   if (!isTizen() || !state.data || !tunerAvailable().channel) return;
   const sats = state.data.channels.filter((c) => hasSource(c, 'sat'));
   if (!sats.length) return;
+  // Sofort aus dem Zwischenspeicher (Zuordnung + Programm), die Tuner-Liste wird im Hintergrund nachgelesen
+  if (!tunerCacheApplied) {
+    tunerCacheApplied = true;
+    const cache = readTunerCache();
+    if (cache) {
+      for (const id of Object.keys(cache.matched)) if (channelById(id)) t.matched[id] = cache.matched[id]!;
+      for (const id of Object.keys(cache.epg)) if (t.matched[id]) t.epg[id] = cache.epg[id]!;
+      t.loaded = Object.keys(t.matched).length > 0;
+      t.fromCache = true;
+      rebuildSatEvents();
+      render();
+    }
+  }
   loadTunerList().then(
     (list) => {
       t.channels = list;
       t.loaded = true;
       t.error = null;
       for (const c of sats) {
+        // Zuerst über die stabile Kennung aus dem Zwischenspeicher, sonst über Namen (HD zuerst)
+        const cached = t.matched[c.id];
+        const bySid = cached ? findByServiceId(list, cached) : null;
         const names = ([] as string[]).concat(...sourcesOf(c).map((s) => (s.kind === 'sat' ? s.names : [])));
-        const m = matchTunerChannel(list, names);
+        const m = bySid || matchTunerChannel(list, names);
         if (m) t.matched[c.id] = m;
+        else delete t.matched[c.id];
       }
+      t.fromCache = false;
       render();
       refreshTunerEpg();
     },
@@ -328,6 +351,7 @@ function refreshTunerEpg(): void {
       (entries) => {
         t.epg[id] = { fetchedAt: Date.now(), entries };
         rebuildSatEvents();
+        writeTunerCache(t.matched, t.epg);
         if (!isPlaying() && !state.overlay && !t.tvOpen) render();
         next();
       },
@@ -400,6 +424,7 @@ function openSat(channelId: string, done?: () => void): void {
         if (r !== 'ok') tunerLog('Tune ' + m.name + ': ' + r);
         satShowInfo(channelId, r === 'ok' ? null : 'Kein Signal – Sender verschlüsselt oder nicht empfangbar.', r !== 'ok');
         if (done) done();
+        if (r !== 'ok') satNoSignalFallback(channelId);
       },
       (e: Error) => {
         if (attempt < 2) {
@@ -429,6 +454,29 @@ function openSat(channelId: string, done?: () => void): void {
       if (done) done();
     },
   );
+}
+
+/** Sat-Sender ohne Signal (verschlüsselt): Sat-Weg für eine Weile überspringen, damit Zappen und Kacheln den nächsten Weg nehmen */
+const satFailed: Record<string, number> = {};
+const SAT_FAILED_TTL_MS = 30 * 60 * 1000;
+const satFailedRecently = (id: string) => !!satFailed[id] && Date.now() - satFailed[id]! < SAT_FAILED_TTL_MS;
+
+/** Verschlüsselter/leerer Sat-Sender: nach kurzer Anzeige automatisch zur externen App (Dialog) */
+function satNoSignalFallback(channelId: string): void {
+  const c = channelById(channelId);
+  const ext = c ? ways(c).filter((w) => w.kind === 'ext')[0] : undefined;
+  satFailed[channelId] = Date.now();
+  if (!ext) return;
+  window.setTimeout(() => {
+    if (!state.tuner.tvOpen || state.tuner.current !== channelId) return;
+    satViewLeave();
+    hideTvWindow().then(() => {
+      state.tuner.tvOpen = false;
+      zapCurrent = null;
+      render();
+      openWatch(channelId, null, null, 'Kein Sat-Signal (Sender verschlüsselt).');
+    });
+  }, 1500);
 }
 
 /** Gemeinsame Zapp-Liste: alle Sender, die die App selbst zeigt (Stream oder Sat), in Favoriten-Reihenfolge */
@@ -461,17 +509,31 @@ function zapDone(): void {
   zapBusyUntil = 0;
 }
 
+/** Zuvor gesehener Sender (für «letzter Sender») */
+let lastChannel: string | null = null;
+
+function viewingChannel(): string | null {
+  return zapCurrent || (state.tuner.tvOpen ? state.tuner.current : currentPlayerChannel());
+}
+
 /** Hoch/Runter: nächster Sender der gemeinsamen Liste, unabhängig vom Empfangsweg */
 function zap(step: number): void {
-  const now = Date.now();
-  if (now < zapBusyUntil) return;
   const list = zapList();
   if (!list.length) return;
-  const current = zapCurrent || (state.tuner.tvOpen ? state.tuner.current : currentPlayerChannel());
-  const i = list.map((c) => c.id).indexOf(current || '');
-  const nextCh = list[(i + step + list.length) % list.length]!;
+  const i = list.map((c) => c.id).indexOf(viewingChannel() || '');
+  zapTo(list[(i + step + list.length) % list.length]!);
+}
+
+/** Auf einen bestimmten Sender umschalten (Stream oder Sat), aus dem laufenden Bild heraus */
+function zapTo(nextCh: Channel): void {
+  const now = Date.now();
+  if (now < zapBusyUntil) return;
   const w = firstWay(nextCh);
-  if (!w) return;
+  if (!w || w.kind === 'ext') return;
+  const cur = viewingChannel();
+  if (cur && cur !== nextCh.id) lastChannel = cur;
+  if (cur === nextCh.id) return;
+  closePicker();
   zapCurrent = nextCh.id;
   zapBusyUntil = now + 1500; // Sicherheitsnetz, falls ein Rückruf ausbleibt
   if (w.kind === 'sat') {
@@ -514,11 +576,130 @@ function satKey(code: number): boolean {
     zap(1);
     return true;
   }
+  if (viewingKey(code)) return true;
   if (code === 13 && state.tuner.current) {
     satShowInfo(state.tuner.current, null, false);
     return true;
   }
   return true;
+}
+
+// ---------------------------------------------------------------- Direktwahl im Bild: Favoritenleiste, Ziffern, letzter Sender
+
+let pickerIndex = -1;
+let pickerTimer: number | null = null;
+let digitBuffer = '';
+let digitTimer: number | null = null;
+
+function pickerOpen(): boolean {
+  return pickerIndex >= 0;
+}
+
+function closePicker(): void {
+  pickerIndex = -1;
+  const el = document.getElementById('picker');
+  if (el) el.hidden = true;
+  if (pickerTimer !== null) window.clearTimeout(pickerTimer);
+  pickerTimer = null;
+}
+
+/** Favoritenleiste: Links/Rechts blättert, OK schaltet um, blendet nach 6 s aus */
+function showPicker(step: number): void {
+  const list = zapList();
+  if (!list.length) return;
+  if (!pickerOpen()) {
+    const i = list.map((c) => c.id).indexOf(viewingChannel() || '');
+    pickerIndex = i === -1 ? 0 : i;
+  }
+  pickerIndex = (pickerIndex + step + list.length) % list.length;
+  const el = document.getElementById('picker');
+  if (!el) return;
+  clear(el);
+  const now = new Date();
+  const row = h('div', { class: 'picker__row' });
+  for (let k = -3; k <= 3; k++) {
+    const c = list[(pickerIndex + k + list.length) % list.length]!;
+    const nn = nowNext(epgFor(c), now);
+    row.appendChild(
+      h(
+        'div',
+        { class: 'picker__item' + (k === 0 ? ' is-current' : '') },
+        h('div', { class: 'picker__num' }, String(((pickerIndex + k + list.length) % list.length) + 1)),
+        h('div', { class: 'picker__name' }, c.name),
+        h('div', { class: 'picker__now' }, nn.now ? nn.now.title : wayLabel(c)),
+      ),
+    );
+  }
+  el.appendChild(row);
+  el.appendChild(h('div', { class: 'picker__hint' }, 'Links/Rechts: blättern · OK: umschalten · Zurück: schliessen'));
+  el.hidden = false;
+  if (pickerTimer !== null) window.clearTimeout(pickerTimer);
+  pickerTimer = window.setTimeout(closePicker, 6000);
+}
+
+function pickerSelect(): void {
+  const list = zapList();
+  const c = list[pickerIndex];
+  closePicker();
+  if (c) zapTo(c);
+}
+
+/** Ziffern (123-Feld der Smart Remote): Favoritenplatz 1–99, nach 1,5 s oder bei zwei Ziffern ausgeführt */
+function digitKey(code: number): boolean {
+  let d = -1;
+  if (code >= 48 && code <= 57) d = code - 48;
+  else if (code >= 96 && code <= 105) d = code - 96;
+  if (d < 0) return false;
+  digitBuffer = (digitBuffer + d).slice(-2);
+  const list = zapList();
+  const n = Number(digitBuffer);
+  const el = document.getElementById('picker');
+  if (el) {
+    clear(el);
+    const c = list[n - 1];
+    el.appendChild(h('div', { class: 'picker__digits' }, digitBuffer + (c ? '  ' + c.name : '  –')));
+    el.hidden = false;
+  }
+  if (digitTimer !== null) window.clearTimeout(digitTimer);
+  const go = () => {
+    const target = list[Number(digitBuffer) - 1];
+    digitBuffer = '';
+    digitTimer = null;
+    if (el) el.hidden = true;
+    if (target) zapTo(target);
+  };
+  if (digitBuffer.length >= 2 || n * 10 > list.length) go();
+  else digitTimer = window.setTimeout(go, 1500);
+  return true;
+}
+
+/** Tasten, die im Bild (Stream oder Sat) gleich wirken. true = verarbeitet */
+function viewingKey(code: number): boolean {
+  if (pickerOpen()) {
+    if (code === 37 || code === 39) {
+      showPicker(code === 37 ? -1 : 1);
+      return true;
+    }
+    if (code === 13) {
+      pickerSelect();
+      return true;
+    }
+    if (code === 10009 || code === 8 || code === 27) {
+      closePicker();
+      return true;
+    }
+  } else if (code === 37 || code === 39) {
+    showPicker(0);
+    return true;
+  }
+  if (digitKey(code)) return true;
+  // Letzter Sender: Play/Pause (Smart Remote) oder gelb
+  if (code === 10252 || code === 415 || code === 19 || code === 405) {
+    const c = lastChannel ? channelById(lastChannel) : null;
+    if (c) zapTo(c);
+    return true;
+  }
+  return false;
 }
 
 /** Favoriten (Fallback: alle Sender), die die App selbst zeigen kann oder die Programmdaten haben */
@@ -684,7 +865,9 @@ function renderTunerProbe(box: HTMLElement): void {
       total += entries.length;
       if (!state.data.epg[id]) hints.push(...unclassifiedSportTitles(state.data.rules, entries).map((x) => channelName(id) + ': ' + x));
     }
-    box.appendChild(h('p', { class: 'note' }, 'Sat-EPG-Einträge: ' + total + ' · Sport ohne Wettbewerb: ' + hints.length + (hints.length ? ' – ' + hints.slice(0, 6).join(' · ') : '')));
+    box.appendChild(h('p', { class: 'note' }, 'Sat-EPG-Einträge: ' + total + (t.fromCache ? ' (Zwischenspeicher)' : '') + ' · Sport ohne Wettbewerb: ' + hints.length + (hints.length ? ' – ' + hints.slice(0, 12).join(' · ') : '')));
+    const found = t.events.slice().sort((a, b) => (a.start < b.start ? -1 : 1)).slice(0, 10).map((e) => channelName(e.channel) + ' ' + dayLabel(dayKey(e.start), new Date()) + ' ' + time(e.start) + ' ' + e.title);
+    box.appendChild(h('p', { class: 'note' }, 'Sat-Sport gefunden: ' + (found.length ? found.join(' · ') : '–')));
   }
   box.appendChild(h('p', { class: 'note', id: 'key-log' }, 'Tasten (neueste zuerst): ' + (keyLog.length ? keyLog.join('  ') : '–')));
   box.appendChild(h('p', { class: 'note' }, 'Registriert: ' + (keyRegistration.ok.join(' ') || '–') + (keyRegistration.failed.length ? ' · abgelehnt: ' + keyRegistration.failed.join(' ') : '')));
@@ -772,6 +955,7 @@ function openTvWindow(retry: boolean = true): void {
 }
 
 function closeTvWindow(): void {
+  closePicker();
   satViewLeave();
   hideTvWindow().then(() => {
     state.tuner.tvOpen = false;
@@ -877,6 +1061,7 @@ function play(channelId: string): void {
     playableChannels(),
     channelId,
     () => {
+      closePicker();
       if (!state.tuner.tvOpen) zapCurrent = null;
       render();
       const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
@@ -1089,6 +1274,10 @@ function onKey(e: KeyboardEvent): void {
   if (isPlaying() && (code === 38 || code === 40 || code === 427 || code === 428)) {
     e.preventDefault();
     zap(code === 38 || code === 427 ? -1 : 1);
+    return;
+  }
+  if (isPlaying() && viewingKey(code)) {
+    e.preventDefault();
     return;
   }
   if (playerKey(code)) {

@@ -129,6 +129,57 @@ await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(900);
 st = await page.evaluate(() => ({ info: (document.getElementById('sat-info') || {}).innerText || '', log: window.__MOCK_LOG__.slice() }));
 check(/Sat\.1/.test(st.info), 'Runter, Runter → Sat.1 (RTL übersprungen? nein: RTL ist zugeordnet) – aktuell: ' + st.info.split('\n')[0]);
+console.log('Direktwahl im Bild:');
+await page.waitForTimeout(1600); // Entprellung
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(300);
+let pk = await page.evaluate(() => ({ hidden: document.getElementById('picker').hidden, text: document.getElementById('picker').innerText }));
+check(!pk.hidden && /Sat\.1/.test(pk.text) && /ProSieben/.test(pk.text) && /umschalten/.test(pk.text), 'Rechts öffnet Favoritenleiste um Sat.1: ' + pk.text.replace(/\n/g, ' ').slice(0, 90));
+await page.keyboard.press('ArrowRight');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(900);
+st = await page.evaluate(() => ({ info: (document.getElementById('sat-info') || {}).innerText || '', log: window.__MOCK_LOG__.slice(), picker: document.getElementById('picker').hidden }));
+check(/ProSieben/.test(st.info) && st.picker, 'Rechts, OK → ProSieben, Leiste geschlossen: ' + st.info.split('\n')[0]);
+await page.waitForTimeout(1600);
+await page.keyboard.press('Digit4');
+await page.waitForTimeout(1900);
+st = await page.evaluate(() => ({ info: (document.getElementById('sat-info') || {}).innerText || '' }));
+check(/Das Erste/.test(st.info), 'Ziffer 4 → Favorit 4 (Das Erste): ' + st.info.split('\n')[0]);
+await page.waitForTimeout(1600);
+await page.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 10252, bubbles: true })));
+await page.waitForTimeout(900);
+st = await page.evaluate(() => ({ info: (document.getElementById('sat-info') || {}).innerText || '' }));
+check(/ProSieben/.test(st.info), 'Play/Pause → letzter Sender (ProSieben): ' + st.info.split('\n')[0]);
+await page.waitForTimeout(1600);
+await page.keyboard.press('Digit1');
+await page.waitForTimeout(1900);
+st = await page.evaluate(() => ({ sat: document.documentElement.classList.contains('is-sat'), playing: !document.getElementById('player').hidden }));
+check(!st.sat && st.playing, 'Ziffer 1 → SRF 1: Sat-Bild zu, Stream-Player offen');
+await page.keyboard.press('Backspace');
+await page.waitForTimeout(600);
+
+console.log('Verschlüsselter Sender → App-Fallback:');
+await page.click('[data-key="tab:channels"]');
+await page.waitForTimeout(300);
+await page.click('[data-key="ch:orf1"]');
+await page.waitForTimeout(2600);
+st = await page.evaluate(() => ({ sat: document.documentElement.classList.contains('is-sat'), overlay: (document.getElementById('overlay') || {}).innerText || '' }));
+check(!st.sat && /Kein Sat-Signal/.test(st.overlay) && /Zattoo öffnen/.test(st.overlay), 'ORF 1 ohne Signal → Dialog mit Zattoo: ' + st.overlay.replace(/\n/g, ' | ').slice(0, 100));
+await page.keyboard.press('Backspace');
+await page.waitForTimeout(300);
+
+console.log('Zwischenspeicher:');
+const cacheRaw = await page.evaluate(() => { try { return localStorage.getItem('ftg:tuner:v1') || ''; } catch (e) { return ''; } });
+check(cacheRaw.length > 1000 && /_serviceId/.test(cacheRaw), 'Tuner-Zuordnung und EPG gespeichert (' + cacheRaw.length + ' Zeichen)');
+await page.reload();
+await page.waitForTimeout(1500); // noch bevor der Tuner nachgelesen hat, muss Programm aus dem Speicher da sein
+await page.click('[data-key="tab:channels"]');
+await page.waitForTimeout(200);
+const tileCached = await page.evaluate(() => (document.querySelector('[data-key="ch:daserste"]') || {}).innerText || '');
+check(/Sportschau Bundesliga|Tatort|Sendung/.test(tileCached), 'Nach Neustart sofort Programm aus dem Zwischenspeicher: ' + tileCached.replace(/\n/g, ' | ').slice(0, 80));
+
+await page.click('[data-key="ch:daserste"]');
+await page.waitForTimeout(800);
 await page.keyboard.press('Backspace');
 await page.waitForTimeout(600);
 st = await page.evaluate(() => ({ sat: document.documentElement.classList.contains('is-sat'), log: window.__MOCK_LOG__.slice() }));

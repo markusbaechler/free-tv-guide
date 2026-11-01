@@ -467,3 +467,26 @@ button {
 .prow.is-focused .prow__bar { background: rgba(11, 34, 64, 0.25); }
 .prow.is-focused .prow__bar i { background: var(--focus-ink); }
 .pinfo .prow__bar { width: 900px; margin: 14px 0 6px; }
+
+/* Direktwahl im Bild: Favoritenleiste und Zifferneingabe */
+.picker {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  padding: 36px 96px 32px;
+  background: rgba(5, 16, 31, 0.86);
+  border-bottom: 8px solid var(--focus);
+  z-index: 20;
+}
+.picker[hidden] { display: none; }
+.picker__row { display: flex; }
+.picker__item { flex: 0 0 246px; margin-right: 12px; padding: 18px 20px; border-radius: 10px; background: rgba(255, 255, 255, 0.08); min-width: 0; }
+.picker__item.is-current { background: var(--focus); color: var(--focus-ink); }
+.picker__num { font-size: 22px; color: var(--muted); }
+.picker__item.is-current .picker__num { color: var(--focus-ink); }
+.picker__name { font-size: 30px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker__now { margin-top: 6px; font-size: 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.picker__item.is-current .picker__now { color: var(--focus-ink); }
+.picker__hint { margin-top: 18px; font-size: 24px; color: var(--muted); }
+.picker__digits { font-size: 64px; font-weight: 700; font-variant-numeric: tabular-nums; }
