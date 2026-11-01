@@ -8,8 +8,9 @@ import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_M
 import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import { exitApp, isTizen, keyRegistration, launchApp, registerKeys } from './tizen.ts';
 import { satEvents, unclassifiedSportTitles } from './satsport.ts';
-import { findByServiceId, readTunerCache, writeTunerCache } from './tunercache.ts';
+import { findByServiceId, readTunerCache, writeTunerCache, type TunerEpgSlot } from './tunercache.ts';
 import { hideTvWindow, lastEpgSample, listChannels, loadTunerList, matchTunerChannel, programNow, showTvWindow, tuneTo, tunerAvailable, tunerEpg, videoSources, type TunerChannel, type TunerEpgEntry } from './tuner.ts';
+import { harvestActive, harvestStatus, startHarvest, stopHarvest, transponderGroups } from './harvest.ts';
 
 /** Wird beim Build aus config.xml gesetzt */
 declare const __APP_VERSION__: string;
@@ -39,7 +40,7 @@ const state = {
     loaded: false,
     error: null as string | null,
     matched: {} as Record<string, TunerChannel>,
-    epg: {} as Record<string, { fetchedAt: number; entries: TunerEpgEntry[] }>,
+    epg: {} as Record<string, TunerEpgSlot>,
     /** Sport-Events aus dem Sat-Programm (klassifiziert mit rules.json) */
     events: [] as GuideEvent[],
     epgError: null as string | null,
@@ -330,7 +331,8 @@ function ensureTuner(): void {
       }
       t.fromCache = false;
       render();
-      refreshTunerEpg();
+      // Erst die schnellen Abrufe (abgestimmter Transponder), dann kurz darauf die Sammlung über die anderen
+      refreshTunerEpg(() => window.setTimeout(() => maybeHarvest(false), 2000));
     },
     (e: Error) => {
       t.loaded = true;
@@ -340,23 +342,56 @@ function ensureTuner(): void {
   );
 }
 
-/** Programmdaten der zugeordneten Sat-Sender nacheinander laden (schonend für den Tuner) */
-function refreshTunerEpg(): void {
+/** Sat-Sender, deren Programm aus dem Sendesignal kommt (SRG-Sender haben das Programm aus der Pipeline) */
+function satEpgIds(): string[] {
+  const d = state.data;
+  return Object.keys(state.tuner.matched).filter((id) => !d || !d.epg[id]);
+}
+
+/**
+ * Neue Einträge in die vorhandenen einarbeiten (Schlüssel: Beginn). Ein Abruf ohne abgestimmten Transponder liefert
+ * nur jetzt/danach – der darf das gesammelte 7-Tage-Programm nicht verdrängen.
+ */
+function mergeEntries(old: TunerEpgEntry[], fresh: TunerEpgEntry[]): TunerEpgEntry[] {
+  const byStart: Record<string, TunerEpgEntry> = {};
+  for (const e of old) byStart[e.start] = e;
+  for (const e of fresh) byStart[e.start] = e;
+  return Object.keys(byStart)
+    .sort()
+    .map((k) => byStart[k]!);
+}
+
+function storeSatEpg(id: string, entries: TunerEpgEntry[], harvested: boolean): void {
   const t = state.tuner;
-  const ids = Object.keys(t.matched).filter((id) => !t.epg[id] || Date.now() - t.epg[id]!.fetchedAt > TUNER_EPG_MAX_AGE_MS);
+  const old = t.epg[id];
+  const slot: TunerEpgSlot = { fetchedAt: Date.now(), entries: old ? mergeEntries(old.entries, entries) : entries };
+  if (old && old.harvestedAt) slot.harvestedAt = old.harvestedAt;
+  if (harvested) slot.harvestedAt = Date.now();
+  t.epg[id] = slot;
+}
+
+const idle = (): boolean => !isPlaying() && !state.overlay && !state.tuner.tvOpen;
+
+/** Programmdaten der zugeordneten Sat-Sender nacheinander laden (schonend für den Tuner) */
+function refreshTunerEpg(onDone?: () => void): void {
+  const t = state.tuner;
+  const ids = satEpgIds().filter((id) => !t.epg[id] || Date.now() - t.epg[id]!.fetchedAt > TUNER_EPG_MAX_AGE_MS);
   const next = () => {
     const id = ids.shift();
-    if (!id) return;
+    if (!id) {
+      if (onDone) onDone();
+      return;
+    }
     tunerEpg(t.matched[id]!, 7 * 24).then(
       (entries) => {
-        t.epg[id] = { fetchedAt: Date.now(), entries };
+        storeSatEpg(id, entries, false);
         rebuildSatEvents();
         writeTunerCache(t.matched, t.epg);
-        if (!isPlaying() && !state.overlay && !t.tvOpen) render();
+        if (idle()) render();
         next();
       },
       (e: Error) => {
-        t.epg[id] = { fetchedAt: Date.now(), entries: [] };
+        if (!t.epg[id]) t.epg[id] = { fetchedAt: Date.now(), entries: [] };
         if (!t.epgError) {
           t.epgError = e.message;
           tunerLog('EPG-Fehler ' + id + ': ' + e.message);
@@ -366,6 +401,52 @@ function refreshTunerEpg(): void {
     );
   };
   next();
+}
+
+// ---------------------------------------------------------------- EPG-Sammlung über die Transponder (siehe harvest.ts)
+
+/** Volles Programm gilt so lange; danach wird der Transponder erneut abgestimmt */
+const HARVEST_MAX_AGE_MS = 12 * 3600 * 1000;
+/** Lieferte ein Sender trotz Sammlung nur jetzt/danach, früher nochmals versuchen */
+const HARVEST_RETRY_THIN_MS = 60 * 60 * 1000;
+/** Wartezeit je Transponder; im Fernseher-Simulator über window.__FTG_HARVEST_DWELL__ verkürzt */
+const HARVEST_DWELL_MS = Number((window as unknown as { __FTG_HARVEST_DWELL__?: number }).__FTG_HARVEST_DWELL__) || 10000;
+
+function needsHarvest(id: string): boolean {
+  const slot = state.tuner.epg[id];
+  if (!slot || !slot.harvestedAt) return true;
+  const age = Date.now() - slot.harvestedAt;
+  return age > HARVEST_MAX_AGE_MS || (slot.entries.length <= 2 && age > HARVEST_RETRY_THIN_MS);
+}
+
+/** Sammlung starten, wenn der Zuschauer gerade nichts ansieht und Sender ohne volles Programm da sind */
+function maybeHarvest(force: boolean): void {
+  const t = state.tuner;
+  if (!isTizen() || !t.loaded || !t.channels.length || !idle() || harvestActive()) return;
+  const ids = satEpgIds().filter((id) => force || needsHarvest(id));
+  const groups = transponderGroups(t.matched, ids);
+  if (!groups.length) return;
+  startHarvest(groups, {
+    dwellMs: HARVEST_DWELL_MS,
+    maxRounds: 3,
+    hours: 7 * 24,
+    list: t.channels,
+    onGroup: (g, epg) => {
+      for (const m of g.members) if (epg[m.id]) storeSatEpg(m.id, epg[m.id]!, true);
+      rebuildSatEvents();
+      writeTunerCache(t.matched, t.epg);
+    },
+    onProgress: () => {
+      if (idle()) render();
+    },
+  });
+}
+
+/** Vor jeder Bild-/Tonaktion: laufende Sammlung beenden (TV-Bild weg, Ton zurück), dann weiter */
+function afterHarvest(fn: () => void): boolean {
+  if (!harvestActive()) return false;
+  stopHarvest().then(fn);
+  return true;
 }
 
 // ---------------------------------------------------------------- Sat-Sichtmodus: App transparent, TV-Bild dahinter, Info-Leiste
@@ -411,6 +492,7 @@ function satShowInfo(channelId: string, msg: string | null, persistent: boolean)
 function openSat(channelId: string, done?: () => void): void {
   const m = state.tuner.matched[channelId];
   if (!m) return;
+  if (afterHarvest(() => openSat(channelId, done))) return;
   if (state.overlay) closeOverlay();
   else if (!state.tuner.tvOpen) rememberFocus();
   state.tuner.current = channelId;
@@ -869,6 +951,18 @@ function renderTunerProbe(box: HTMLElement): void {
     const found = t.events.slice().sort((a, b) => (a.start < b.start ? -1 : 1)).slice(0, 10).map((e) => channelName(e.channel) + ' ' + dayLabel(dayKey(e.start), new Date()) + ' ' + time(e.start) + ' ' + e.title);
     box.appendChild(h('p', { class: 'note' }, 'Sat-Sport gefunden: ' + (found.length ? found.join(' · ') : '–')));
   }
+  const hs = harvestStatus;
+  const full = satEpgIds().filter((id) => t.epg[id] && t.epg[id]!.entries.length > 2).length;
+  box.appendChild(
+    h(
+      'p',
+      { class: 'note', id: 'harvest-status' },
+      'EPG-Sammlung: ' +
+        (hs.running ? 'läuft, Transponder ' + hs.done + '/' + hs.total : hs.finishedAt ? (hs.aborted ? 'abgebrochen ' : 'fertig ') + time(new Date(hs.finishedAt).toISOString()) : 'noch nicht gelaufen') +
+        ' · volles Programm für ' + full + ' von ' + satEpgIds().length + ' Sat-Sendern' +
+        (hs.log.length ? ' · ' + hs.log.slice(0, 3).join(' · ') : ''),
+    ),
+  );
   box.appendChild(h('p', { class: 'note', id: 'key-log' }, 'Tasten (neueste zuerst): ' + (keyLog.length ? keyLog.join('  ') : '–')));
   box.appendChild(h('p', { class: 'note' }, 'Registriert: ' + (keyRegistration.ok.join(' ') || '–') + (keyRegistration.failed.length ? ' · abgelehnt: ' + keyRegistration.failed.join(' ') : '')));
   box.appendChild(
@@ -881,6 +975,7 @@ function renderTunerProbe(box: HTMLElement): void {
       h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:list' }, h('div', { class: 'tile__name' }, 'Senderliste lesen'), h('div', { class: 'tile__now tile__now--none' }, 'tizen.tvchannel.getChannelList')),
       h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:sources' }, h('div', { class: 'tile__name' }, 'Videoquellen'), h('div', { class: 'tile__now tile__now--none' }, 'systeminfo VIDEOSOURCE')),
       h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:show' }, h('div', { class: 'tile__name' }, 'TV-Bild zeigen'), h('div', { class: 'tile__now tile__now--none' }, 'aktueller Tuner-Sender, Zurück = schliessen')),
+      h('div', { class: 'tile', 'data-nav': true, 'data-key': 'tuner:harvest' }, h('div', { class: 'tile__name' }, 'EPG jetzt sammeln'), h('div', { class: 'tile__now tile__now--none' }, 'alle Transponder stumm durchgehen (ca. 3 Min.)')),
     ),
   );
   for (const line of t.log) box.appendChild(h('p', { class: 'note' }, line));
@@ -922,6 +1017,11 @@ function tunerAction(key: string): void {
     openTvWindow();
     return;
   }
+  if (key === 'tuner:harvest') {
+    maybeHarvest(true);
+    render();
+    return;
+  }
   if (key.indexOf('tuner:ch:') === 0) {
     const ch = state.tuner.channels[Number(key.slice(9))];
     if (!ch) return;
@@ -937,6 +1037,7 @@ function tunerAction(key: string): void {
 }
 
 function openTvWindow(retry: boolean = true): void {
+  if (afterHarvest(() => openTvWindow(retry))) return;
   showTvWindow().then(
     (r) => {
       state.tuner.tvOpen = true;
@@ -1049,6 +1150,7 @@ function canPlay(channelId: string): boolean {
 
 function play(channelId: string): void {
   zapCurrent = channelId;
+  if (afterHarvest(() => play(channelId))) return;
   if (state.overlay) {
     // Dialog schliessen, ohne den Fokus zurückzusetzen; der Player merkt sich die Stelle
     $('overlay').hidden = true;
@@ -1160,6 +1262,7 @@ function launchError(text: string): void {
 function doLaunch(app: PlayerApp, deeplink: string | null): void {
   if (!isTizen()) return launchError('In der Vorschau im Browser lassen sich keine Apps öffnen.');
   if (!app.tizenId) return launchError(app.name + ' ist auf diesem Fernseher noch nicht verknüpft.');
+  if (afterHarvest(() => doLaunch(app, deeplink))) return;
   launchApp(app.tizenId, deeplink).then(
     () => closeOverlay(),
     () => launchError(app.name + ' liess sich nicht öffnen. Ist die App installiert?'),
@@ -1241,6 +1344,7 @@ function activate(el: HTMLElement): void {
   if (key === 'launch:ext' && pendingLaunch) return doLaunch(pendingLaunch.app, pendingLaunch.deeplink);
   if (key === 'close') return closeOverlay();
   if (key === 'exit') {
+    if (afterHarvest(() => activate(el))) return;
     if (!exitApp()) launchError('In der Vorschau gibt es nichts zu beenden.');
     return;
   }
@@ -1345,17 +1449,27 @@ function refresh(): void {
       fromCache: t.fromCache,
       channels: t.channels.length,
       matched: Object.keys(t.matched).map((id) => ({ id, name: t.matched[id]!.name, major: t.matched[id]!.major, serviceId: t.matched[id]!.raw._serviceId })),
-      epgCounts: Object.keys(t.epg).map((id) => ({ id, n: t.epg[id]!.entries.length, fetchedAt: new Date(t.epg[id]!.fetchedAt).toISOString() })),
+      epgCounts: Object.keys(t.epg).map((id) => ({ id, n: t.epg[id]!.entries.length, fetchedAt: new Date(t.epg[id]!.fetchedAt).toISOString(), harvestedAt: t.epg[id]!.harvestedAt ? new Date(t.epg[id]!.harvestedAt!).toISOString() : null })),
       events: t.events.map((e) => ({ channel: e.channel, start: e.start, title: e.title, competition: e.competition, kind: e.kind })),
       tvOpen: t.tvOpen,
       current: t.current,
       log: t.log,
     },
     epg,
+    harvest: harvestStatus,
+    transponders: transponderGroups(t.matched, satEpgIds()).map((g) => ({ key: g.key, tune: g.tune.name, ids: g.members.map((m) => m.id) })),
     keys: keyLog.slice(),
     keyRegistration,
     lastChannel,
   };
+};
+/** Sammlung von Hand anstossen (Debug-Konsole) */
+(window as unknown as { ftgHarvest: () => string }).ftgHarvest = () => {
+  const t = state.tuner;
+  const before = harvestActive();
+  maybeHarvest(true);
+  if (harvestActive() && !before) return 'gestartet';
+  return 'nicht gestartet: ' + JSON.stringify({ tizen: isTizen(), loaded: t.loaded, channels: t.channels.length, playing: isPlaying(), overlay: state.overlay, tvOpen: t.tvOpen, active: before, groups: transponderGroups(t.matched, satEpgIds()).length });
 };
 
 function start(): void {
@@ -1379,7 +1493,11 @@ function start(): void {
   });
   // Rückkehr aus Joyn/Zattoo (App lief im Hintergrund): Daten und Anzeige auffrischen
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
+    if (document.hidden) {
+      // App geht in den Hintergrund: Sammlung beenden, damit der Fernseher nicht stumm bleibt
+      stopHarvest();
+      return;
+    }
     if (state.overlay) closeOverlay();
     refresh();
   });
@@ -1393,7 +1511,7 @@ function start(): void {
     else renderStatus();
   }, REFRESH_VIEW_MS);
   setInterval(() => {
-    if (state.tuner.loaded && !state.tuner.tvOpen) refreshTunerEpg();
+    if (state.tuner.loaded && !state.tuner.tvOpen) refreshTunerEpg(() => maybeHarvest(false));
   }, TUNER_EPG_MAX_AGE_MS);
 }
 

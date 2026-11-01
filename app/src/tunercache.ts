@@ -8,11 +8,18 @@ const KEEP_PAST_MS = 3 * 3600 * 1000;
 /** Höchstens so viele Einträge je Sender speichern (Speicherplatz am TV) */
 const MAX_ENTRIES = 400;
 
+/** Programm eines Sat-Senders; harvestedAt = zuletzt mit abgestimmtem Transponder gelesen (volles Programm) */
+export interface TunerEpgSlot {
+  fetchedAt: number;
+  harvestedAt?: number;
+  entries: TunerEpgEntry[];
+}
+
 export interface TunerCache {
   savedAt: number;
   /** Sender-ID → zugeordneter Tuner-Sender (Rohobjekt inkl. _serviceId) */
   matched: Record<string, TunerChannel>;
-  epg: Record<string, { fetchedAt: number; entries: TunerEpgEntry[] }>;
+  epg: Record<string, TunerEpgSlot>;
 }
 
 export function readTunerCache(): TunerCache | null {
@@ -27,13 +34,15 @@ export function readTunerCache(): TunerCache | null {
   }
 }
 
-export function writeTunerCache(matched: Record<string, TunerChannel>, epg: Record<string, { fetchedAt: number; entries: TunerEpgEntry[] }>): void {
+export function writeTunerCache(matched: Record<string, TunerChannel>, epg: Record<string, TunerEpgSlot>): void {
   try {
     const cutoff = new Date(Date.now() - KEEP_PAST_MS).toISOString();
     const slim: TunerCache['epg'] = {};
     for (const id of Object.keys(epg)) {
       const e = epg[id]!;
-      slim[id] = { fetchedAt: e.fetchedAt, entries: e.entries.filter((x) => !x.end || x.end >= cutoff).slice(0, MAX_ENTRIES) };
+      const slot: TunerEpgSlot = { fetchedAt: e.fetchedAt, entries: e.entries.filter((x) => !x.end || x.end >= cutoff).slice(0, MAX_ENTRIES) };
+      if (e.harvestedAt) slot.harvestedAt = e.harvestedAt;
+      slim[id] = slot;
     }
     window.localStorage.setItem(KEY, JSON.stringify({ savedAt: Date.now(), matched, epg: slim }));
   } catch (e) {

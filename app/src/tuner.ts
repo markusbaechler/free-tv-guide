@@ -29,10 +29,17 @@ interface SysInfoApi {
   getPropertyValue(prop: string, ok: (v: unknown) => void, err?: (e: { message: string }) => void): void;
 }
 
+/** tizen.tvaudiocontrol (Privileg tv.audio): synchron */
+interface TvAudioApi {
+  setMute(mute: boolean): void;
+  isMute(): boolean;
+}
+
 interface TizenNs {
   tvchannel?: TvChannelApi;
   tvwindow?: TvWindowApi;
   systeminfo?: SysInfoApi;
+  tvaudiocontrol?: TvAudioApi;
   /** Tizen-Zeittyp; die TV-APIs erwarten ihn statt JavaScript-Date */
   TZDate?: new (d: Date) => unknown;
 }
@@ -141,6 +148,56 @@ export function hideTvWindow(): Promise<void> {
     }
   });
 }
+
+/** Ton des Fernsehers stumm schalten (für das EPG-Sammeln im Hintergrund). false = API fehlt */
+export function setMute(on: boolean): boolean {
+  const t = tz();
+  if (!t || !t.tvaudiocontrol) return false;
+  try {
+    t.tvaudiocontrol.setMute(on);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+export function isMuted(): boolean {
+  const t = tz();
+  if (!t || !t.tvaudiocontrol) return false;
+  try {
+    return !!t.tvaudiocontrol.isMute();
+  } catch (e) {
+    return false;
+  }
+}
+
+/** Derzeit abgestimmter Tuner-Sender, als Eintrag der gelesenen Liste (null, wenn unbekannt) */
+export function currentTunerChannel(list: TunerChannel[]): TunerChannel | null {
+  const t = tz();
+  if (!t || !t.tvchannel) return null;
+  let raw: Record<string, unknown> | null = null;
+  try {
+    raw = t.tvchannel.getCurrentChannel('MAIN');
+  } catch (e) {
+    return null;
+  }
+  if (!raw) return null;
+  for (const c of list) if (c.raw._serviceId !== undefined && c.raw._serviceId === raw._serviceId) return c;
+  for (const c of list) if (c.raw.major === raw.major && c.raw.ptc === raw.ptc && c.raw.programNumber === raw.programNumber) return c;
+  return null;
+}
+
+/**
+ * Transponder-Schlüssel eines Senders (Quelle/Netz/Transportstrom). Der Fernseher hält das volle 7-Tage-Programm
+ * nur für den Transponder, auf den er zuletzt abgestimmt war; alle Sender eines Transponders teilen sich das.
+ */
+export function transponderKey(ch: TunerChannel): string {
+  const r = ch.raw;
+  return [r.sourceID, r.originalNetworkID, r.transportStreamID].map((v) => (v === undefined || v === null ? '' : String(v))).join('/');
+}
+
+/** Verschlüsselt laut Senderliste (dann liefert Tune «kein Signal») */
+export const isScrambled = (ch: TunerChannel): boolean => ch.raw.scrambled === true;
 
 /** Aktuelle Sendung aus dem Sendesignal (DVB-EPG), falls verfügbar. */
 export function programNow(ch: TunerChannel): Promise<string> {

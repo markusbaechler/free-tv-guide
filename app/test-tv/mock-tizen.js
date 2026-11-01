@@ -17,12 +17,21 @@
     return this._d.toString();
   };
 
+  // Fixture-Felder: name, major, tsid (Transponder; Standard: eigener), scrambled (verschlüsselt → kein Signal)
   var channels = (window.__MOCK_CHANNELS__ || []).map(function (c, i) {
-    return { _serviceId: String(8083645915586537470 + i), channelName: c.name, lcn: 65535, major: c.major, minor: 65534, ptc: 100 + i, sourceID: 1, programNumber: 1000 + i, originalNetworkID: 1, transportStreamID: 1050 + i };
+    // 19-stellige Kennung als Zeichenkette (als Zahl wäre sie jenseits von 2^53 und nicht mehr eindeutig)
+    var o = { _serviceId: '808364591558653' + (7470 + i), channelName: c.name, lcn: 65535, major: c.major, minor: 65534, ptc: 100 + i, sourceID: 0, programNumber: 1000 + i, originalNetworkID: 1, transportStreamID: c.tsid || 1050 + i };
+    if (c.scrambled) o.scrambled = true;
+    return o;
   });
   var epg = window.__MOCK_EPG__ || {}; // channelName -> [{title, description, start (ISO), durationSec}]
   var log = (window.__MOCK_LOG__ = []);
   var current = null;
+  var muted = false;
+  // Wie am QE75Q70R: das volle 7-Tage-Programm hat der Fernseher nur für den zuletzt abgestimmten Transponder,
+  // und erst, wenn er dort eine Weile war (Tabellen eingesammelt). Sonst nur jetzt/danach.
+  var fullSince = null;
+  var COLLECT_MS = Number(window.__MOCK_EPG_COLLECT_MS__ || 150);
 
   window.tizen = {
     TZDate: TZDate,
@@ -38,9 +47,10 @@
         })[0];
         setTimeout(function () {
           if (!ch) return err({ message: 'Failed to set selected channel' });
+          if (!current || current.transportStreamID !== ch.transportStreamID) fullSince = Date.now() + COLLECT_MS;
           current = ch;
           log.push('tune ' + ch.channelName);
-          if (/ORF/.test(ch.channelName)) return cb.onnosignal && cb.onnosignal();
+          if (ch.scrambled || /ORF/.test(ch.channelName)) return cb.onnosignal && cb.onnosignal();
           cb.onsuccess && cb.onsuccess(ch, win);
         }, 20);
       },
@@ -54,16 +64,18 @@
           }, 5);
           return;
         }
-        // Wie der QE75Q70R: nur Sendungen ab Startzeit, höchstens 12 je Abruf
+        // Wie der QE75Q70R: nur Sendungen ab Startzeit, höchstens 12 je Abruf; volles Programm nur auf dem
+        // abgestimmten Transponder (nach Sammelzeit), sonst jetzt/danach (2 Einträge ab jetzt)
         var fromMs = start._d.getTime();
+        var full = current && current.transportStreamID === ch.transportStreamID && fullSince !== null && Date.now() >= fullSince;
         var list = (epg[ch.channelName] || [])
           .filter(function (p) {
-            return new Date(p.start).getTime() >= fromMs - 3600 * 1000;
+            return new Date(p.start).getTime() >= (full ? fromMs : Date.now()) - 3600 * 1000;
           })
           .sort(function (a, b) {
             return new Date(a.start) - new Date(b.start);
           })
-          .slice(0, 12)
+          .slice(0, full ? 12 : 2)
           .map(function (p) {
             var o = { detailedDescription: p.description || '', title: p.title, startTime: new TZDate(p.start) };
             if (p.durationSec) o.duration = p.durationSec;
@@ -92,6 +104,15 @@
       },
       getSource: function () {
         return { type: 'TV', number: 1 };
+      },
+    },
+    tvaudiocontrol: {
+      setMute: function (on) {
+        muted = !!on;
+        log.push(on ? 'mute on' : 'mute off');
+      },
+      isMute: function () {
+        return muted;
       },
     },
     systeminfo: {

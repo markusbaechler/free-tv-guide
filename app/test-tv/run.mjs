@@ -21,15 +21,18 @@ const server = createServer((req, res) => {
 }).listen(0);
 const port = server.address().port;
 
-// Tuner-Senderliste wie am QE75Q70R (Auszug) – Namen entsprechen channels.yaml (sat.names)
+// Tuner-Senderliste wie am QE75Q70R (Auszug) – Namen entsprechen channels.yaml (sat.names); tsid = Transponder
+// (Zuordnung wie am TV am 1.11.2026 gelesen), scrambled = verschlüsselt (SRG, ORF)
 const CHANNELS = [
-  { name: 'SRF 1 HD', major: 1 }, { name: 'SRF zwei HD', major: 2 }, { name: 'SRF info HD', major: 3 },
-  { name: 'Das Erste HD', major: 4 }, { name: 'ZDF HD', major: 5 }, { name: 'RTL Television', major: 6 },
-  { name: 'SAT.1', major: 7 }, { name: 'ProSieben', major: 8 }, { name: 'VOX', major: 9 }, { name: 'RTLZWEI', major: 10 },
-  { name: 'kabel eins', major: 11 }, { name: 'Eurosport 1 Deutschland', major: 12 }, { name: 'SPORT1', major: 13 },
-  { name: '3sat HD', major: 14 }, { name: 'arte HD', major: 15 }, { name: 'phoenix HD', major: 16 }, { name: 'DMAX', major: 20 },
-  { name: 'ORF1 HD', major: 448 }, { name: 'ServusTV HD Oesterreich', major: 450 }, { name: 'ORF2 HD', major: 1107 },
+  { name: 'SRF 1 HD', major: 1, tsid: 12300, scrambled: true }, { name: 'SRF zwei HD', major: 2, tsid: 12300, scrambled: true }, { name: 'SRF info HD', major: 3, tsid: 12300, scrambled: true },
+  { name: 'Das Erste HD', major: 4, tsid: 1019 }, { name: 'ZDF HD', major: 5, tsid: 1011 }, { name: 'RTL Television', major: 6, tsid: 1089 },
+  { name: 'SAT.1', major: 7, tsid: 1107 }, { name: 'ProSieben', major: 8, tsid: 1107 }, { name: 'VOX', major: 9, tsid: 1089 }, { name: 'RTLZWEI', major: 10, tsid: 1089 },
+  { name: 'kabel eins', major: 11, tsid: 1107 }, { name: 'Eurosport 1 Deutschland', major: 12, tsid: 1091 }, { name: 'SPORT1', major: 13, tsid: 33 },
+  { name: '3sat HD', major: 14, tsid: 1010 }, { name: 'arte HD', major: 15, tsid: 1019 }, { name: 'phoenix HD', major: 16, tsid: 1025 }, { name: 'DMAX', major: 20, tsid: 33 },
+  { name: 'ORF1 HD', major: 448, tsid: 1007, scrambled: true }, { name: 'ServusTV HD Oesterreich', major: 450, tsid: 1008 }, { name: 'ORF2 HD', major: 1107, tsid: 1117, scrambled: true },
 ];
+// Unverschlüsselte Transponder in der Liste (müssen alle von der Sammlung abgestimmt werden)
+const TRANSPONDERS = 9;
 const now = Date.now();
 const at = (h) => new Date(now + h * 3600 * 1000).toISOString();
 // Programm: Formen wie am TV (detailedDescription + title; Dauer fehlt teils)
@@ -58,10 +61,27 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.addInitScript({ content: `window.__MOCK_CHANNELS__ = ${JSON.stringify(CHANNELS)}; window.__MOCK_EPG__ = ${JSON.stringify(EPG)};` });
+// Sammlung im Simulator schnell: 250 ms je Transponder (am TV 10 s); der Simulator «sammelt» Tabellen in 150 ms
+await page.addInitScript({ content: `window.__MOCK_CHANNELS__ = ${JSON.stringify(CHANNELS)}; window.__MOCK_EPG__ = ${JSON.stringify(EPG)}; window.__FTG_HARVEST_DWELL__ = 250;` });
 await page.addInitScript({ content: readFileSync(join(APP, 'test-tv', 'mock-tizen.js'), 'utf8') });
 await page.goto(`http://localhost:${port}/`);
-await page.waitForTimeout(6000); // Daten laden, Tuner lesen, EPG je Sender (30 × ~10 ms)
+await page.waitForTimeout(3500); // Daten laden, Tuner lesen, erste EPG-Abrufe (nur jetzt/danach), Sammlung startet nach 2 s
+
+console.log('EPG-Sammlung über die Transponder:');
+let st0 = await page.evaluate(() => ({ h: JSON.parse(JSON.stringify(window.ftgDiag().harvest)), log: window.__MOCK_LOG__.slice() }));
+check(st0.h.running || st0.h.finishedAt, 'Sammlung läuft nach dem Start von selbst (' + (st0.h.running ? 'läuft ' + st0.h.done + '/' + st0.h.total : 'fertig') + ')');
+check(st0.log.indexOf('mute on') >= 0 && st0.log.indexOf('mute on') < st0.log.indexOf('tvwindow.show BEHIND') + 2, 'Ton stumm, TV-Bild hinten (verdeckt): ' + st0.log.slice(0, 4).join(', '));
+await page.waitForTimeout(9000);
+st0 = await page.evaluate(() => ({ h: JSON.parse(JSON.stringify(window.ftgDiag().harvest)), log: window.__MOCK_LOG__.slice(), counts: window.ftgDiag().tuner.epgCounts, sat: document.documentElement.classList.contains('is-sat') }));
+check(!st0.h.running && !st0.h.aborted && st0.h.total === TRANSPONDERS, 'Sammlung fertig, ' + st0.h.total + ' Transponder (erwartet ' + TRANSPONDERS + '), nicht abgebrochen');
+const tunes = st0.log.filter((l) => l.indexOf('tune ') === 0);
+check(tunes.length >= TRANSPONDERS, 'Je Transponder abgestimmt: ' + tunes.join(', '));
+check(!tunes.some((l) => /ORF|SRF/.test(l)), 'Verschlüsselte Transponder (SRG, ORF) nicht abgestimmt');
+const lastMute = st0.log.filter((l) => l.indexOf('mute') === 0).pop();
+check(lastMute === 'mute off' && st0.log[st0.log.length - 1] === 'mute off' && st0.log[st0.log.length - 2] === 'tvwindow.hide' && !st0.sat, 'Am Ende TV-Bild versteckt, dann Ton zurück, App undurchsichtig: ' + st0.log.slice(-3).join(', '));
+const cnt = (id) => (st0.counts.filter((c) => c.id === id)[0] || { n: 0 }).n;
+check(cnt('daserste') >= 40 && cnt('zdf') >= 2 && cnt('servustv') >= 1, 'Volles Programm je Transponder: Das Erste ' + cnt('daserste') + ', ZDF ' + cnt('zdf') + ', ServusTV ' + cnt('servustv'));
+check(st0.counts.filter((c) => c.id === 'daserste')[0].harvestedAt, 'Sammelzeitpunkt je Sender gespeichert');
 
 console.log('Tuner-Diagnose:');
 await page.click('[data-key="tab:channels"]');
@@ -72,6 +92,7 @@ check(/zugeordnet (1[5-9]|2\d|3\d)/.test(diag), 'Sat-Zuordnung ≥ 15 Sender');
 check(/Programm von [1-9]\d* Sat-Sendern/.test(diag), 'Programm von > 0 Sat-Sendern');
 check(/Sport-Events aus Sat: [1-9]/.test(diag), 'Sport-Events aus Sat > 0');
 check(/Regeln: ja/.test(diag), 'Regeln geladen');
+check(/EPG-Sammlung: fertig/.test(diag) && /volles Programm für [1-9]\d* von/.test(diag), 'Diagnose zeigt Sammlung: ' + (diag.match(/EPG-Sammlung: [^|]{0,80}/) || [''])[0]);
 
 console.log('Tab Sender:');
 const tileErste = await page.evaluate(() => (document.querySelector('[data-key="ch:daserste"]') || {}).innerText || '');
@@ -188,6 +209,26 @@ await page.keyboard.press('Backspace');
 await page.waitForTimeout(600);
 st = await page.evaluate(() => ({ sat: document.documentElement.classList.contains('is-sat'), log: window.__MOCK_LOG__.slice() }));
 check(!st.sat && st.log[st.log.length - 1] === 'tvwindow.hide', 'Zurück schliesst Sat-Modus');
+
+console.log('EPG-Sammlung: kein zweiter Durchgang, Abbruch durch den Zuschauer:');
+await page.waitForTimeout(3500); // Tuner nachgelesen + 2 s Verzögerung: gesammeltes Programm ist jünger als 12 h → nichts zu tun
+st = await page.evaluate(() => ({ h: JSON.parse(JSON.stringify(window.ftgDiag().harvest)), n: window.ftgDiag().tuner.epgCounts.filter((c) => c.id === 'daserste')[0].n }));
+check(!st.h.running && st.h.startedAt === null && st.n >= 40, 'Nach Neustart keine neue Sammlung (Sammelzeitpunkt aus dem Speicher), Programm bleibt voll: ' + st.n);
+// Von Hand gestartet, sofort Sat-Sender gewählt: Sammlung bricht ab, räumt auf (Ton zurück, Bild versteckt), dann erst Umschalten
+const started = await page.evaluate(() => { window.__MOCK_LOG__.length = 0; return window.ftgHarvest(); });
+console.log('  ftgHarvest(): ' + started);
+console.log('  ' + await page.evaluate(() => JSON.stringify({ m: window.ftgDiag().tuner.matched.length, tp: window.ftgDiag().transponders.length, sample: window.ftgDiag().tuner.matched[3] })));
+await page.waitForTimeout(120);
+await page.click('[data-key="ch:daserste"]');
+await page.waitForTimeout(1500);
+st = await page.evaluate(() => ({ h: JSON.parse(JSON.stringify(window.ftgDiag().harvest)), log: window.__MOCK_LOG__.slice(), sat: document.documentElement.classList.contains('is-sat'), info: (document.getElementById('sat-info') || {}).innerText || '' }));
+const iOff = st.log.indexOf('mute off');
+const iShow = st.log.lastIndexOf('tvwindow.show BEHIND');
+check(st.h.aborted && !st.h.running, 'Sammlung abgebrochen: ' + st.h.log.slice(0, 2).join(' · '));
+check(iOff >= 0 && iShow > iOff && st.log.indexOf('tvwindow.hide') < iShow && st.log[st.log.length - 1] === 'tune Das Erste HD', 'Erst aufräumen (Ton, Bild), dann Sat-Bild und Umschalten: ' + st.log.join(', '));
+check(st.sat && /Das Erste/.test(st.info), 'Sat-Bild offen auf Das Erste');
+await page.keyboard.press('Backspace');
+await page.waitForTimeout(600);
 
 await page.screenshot({ path: '/tmp/tv-sim.png' });
 await browser.close();
