@@ -5,7 +5,7 @@ import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './f
 import { addDaysKey, dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
-import { clock, closePlayer, currentPlayerChannel, isPlaying, isVodPlaying, openPlayer, openVod, playerKey, resumePosition, switchPlayerChannel, type PlayableChannel } from './player.ts';
+import { clock, closePlayer, currentPlayerChannel, isPlaying, isVodPlaying, openPlayer, openVod, playerKey, playerStats, resumePosition, switchPlayerChannel, type PlayableChannel } from './player.ts';
 import type { ReplayEntry } from '../../pipeline/types.ts';
 import { exitApp, isTizen, keyRegistration, launchApp, registerKeys } from './tizen.ts';
 import { satEvents, unclassifiedSportTitles } from './satsport.ts';
@@ -1574,8 +1574,19 @@ function refresh(): void {
     transponders: transponderGroups(t.matched, satEpgIds()).map((g) => ({ key: g.key, tune: g.tune.name, ids: g.members.map((m) => m.id) })),
     keys: keyLog.slice(),
     keyRegistration,
+    player: playerStats(),
     lastChannel,
   };
+};
+/** Nachsehen von der Debug-Konsole starten: n-te Sendung von gestern auf SRF 1 (0 = neueste) */
+(window as unknown as { ftgVod: (n?: number, channel?: string) => string }).ftgVod = (n?: number, channel?: string) => {
+  const ch = channel || 'srf1';
+  const yesterday = addDaysKey(dayKey(new Date()), -1);
+  const list = (state.data ? state.data.replay[ch] || [] : []).filter((e) => dayKey(e.start) === yesterday);
+  const e = list[n || 0];
+  if (!e) return 'keine Sendung (' + list.length + ' gestern auf ' + ch + ')';
+  playReplay(ch, e.urn);
+  return e.title + ' ' + time(e.start);
 };
 /** Sammlung von Hand anstossen (Debug-Konsole) */
 (window as unknown as { ftgHarvest: () => string }).ftgHarvest = () => {

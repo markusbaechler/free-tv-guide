@@ -17,6 +17,7 @@ interface PlayerHandle {
   seekBy(seconds: number): void;
   seekTo(seconds: number): void;
   position(): { pos: number; dur: number; paused: boolean };
+  stats(): unknown;
   dispose(): void;
 }
 
@@ -72,6 +73,20 @@ function loadPlayerBundle(): Promise<void> {
 
 const root = () => document.getElementById('player') as HTMLElement;
 
+/**
+ * Laufenden Player entsorgen, bevor ein neuer entsteht. Sonst liefert video.js für dieselbe Element-ID den alten
+ * Player zurück («already initialised»), der in einem losgelösten Element weiterspielt (am TV gemessen 4.11.2026).
+ */
+function disposeHandle(): void {
+  if (!handle) return;
+  try {
+    handle.dispose();
+  } catch (e) {
+    // bereits entsorgt
+  }
+  handle = null;
+}
+
 /** ID des Senders, der gerade im Player läuft (null = Player zu) */
 export function currentPlayerChannel(): string | null {
   const ch = channels[index];
@@ -89,6 +104,12 @@ export function switchPlayerChannel(channelId: string): boolean {
 
 export function isPlaying(): boolean {
   return !root().hidden;
+}
+
+/** Diagnose des laufenden Players (null = keiner offen) */
+export function playerStats(): unknown {
+  if (!handle || !isPlaying()) return null;
+  return { mode: vod ? 'vod' : 'live', title: vod ? vod.title : channels[index] ? channels[index]!.name : null, stats: handle.stats() };
 }
 
 /** Läuft gerade eine Sendung zum Nachsehen (nicht live)? */
@@ -136,6 +157,7 @@ function start(): void {
 
 /** Öffnet den Player für einen Sender; list = alle abspielbaren Sender (für Hoch/Runter) */
 export function openPlayer(list: PlayableChannel[], channelId: string, closed: () => void, failover?: (channelId: string) => boolean): void {
+  disposeHandle();
   vod = null;
   channels = list;
   index = Math.max(0, list.map((c) => c.id).indexOf(channelId));
@@ -173,14 +195,7 @@ export function closePlayer(): void {
   vod = null;
   if (vodTimer !== null) window.clearInterval(vodTimer);
   vodTimer = null;
-  if (handle) {
-    try {
-      handle.dispose();
-    } catch (e) {
-      // bereits entsorgt
-    }
-    handle = null;
-  }
+  disposeHandle();
   const el = root();
   clear(el);
   el.hidden = true;
@@ -290,6 +305,7 @@ function showVodInfo(text: string | null, persistent: boolean): void {
 
 /** Öffnet den Player für eine vergangene Sendung (SRG-Video-URN); setzt an der gemerkten Stelle fort */
 export function openVod(item: VodItem, closed: () => void): void {
+  disposeHandle();
   vod = item;
   channels = [];
   index = 0;
@@ -310,7 +326,8 @@ export function openVod(item: VodItem, closed: () => void): void {
       handle = api.create('ftg-video');
       let first = true;
       handle.onPlaying(() => {
-        if (!first) return showVodInfo(null, false);
+        // Nur beim ersten Start einblenden; «playing» kommt auch nach jedem Nachladen und Spulen
+        if (!first) return;
         first = false;
         if (vodResumeAt > 0 && handle) {
           handle.seekTo(vodResumeAt);

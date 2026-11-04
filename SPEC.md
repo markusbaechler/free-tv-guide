@@ -75,6 +75,7 @@ Eine Tizen-Web-App mit drei Bereichen:
 - Filter links: Sender (Alle, SRF 1, SRF zwei, SRF info) und Tag (Heute, Gestern, 5 weitere Tage). Liste: neueste Sendung zuerst, Startzeit, Dauer, Titel, Untertitel, Sender. Dieselbe Sendung auf zwei Sendern (z. B. Tagesschau-Wiederholung auf SRF info, gleiche URN) erscheint einmal, mit der Erstausstrahlung.
 - Player: OK/Play/Pause = Pause, Links/Rechts sowie ⏪/⏩ = 30 s, Hoch/Runter = ±5 Min., 0 = Anfang, Zurück = Liste (Fokus bleibt auf der Sendung). Info-Leiste mit Balken und Position. Kein Zappen und keine Favoritenleiste im Nachsehen.
 - **Fortsetzen:** Position je URN in `localStorage` (`ftg:resume:v1`, max. 40 Einträge), erst ab 1 Min., gelöscht in den letzten 3 Min. Die Liste zeigt «weiter ab mm:ss».
+- **Bildrate (gemessen am TV 4.11.2026):** SRF-Play-Sendungen gibt es nur mit **25 fps** (oberste Stufe 1920×1080, 3,5 Mbit/s, H.264 High), Livestreams mit **50 fps** (1920×1080, 9,3 Mbit/s). Nachsehen wirkt deshalb bei Bewegung weniger flüssig als live. Das ist die Kodierung der SRG, nicht die App: 0 verlorene Bilder, kein Nachladen, Puffer > 60 s bei 35 Mbit/s Leitung. Info-Leiste erscheint nur beim Start und bei Tastendruck, nicht nach Nachladen.
 - Nicht abrufbar (Rechte nur live, z. B. Sport und Spielfilme; noch nicht online; abgelaufen): Pillarbox meldet den Fehler, die Info-Leiste erklärt ihn. Erfahrungswert erster Lauf 4.11.2026: Video-URN bei SRF 1 ca. 75 %, SRF zwei ca. 55 %, SRF info ca. 80 % der Sendungen.
 
 ### 4.4 Tab «Sender»
