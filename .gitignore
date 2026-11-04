@@ -8,3 +8,5 @@ app/dist/
 author.p12
 distributor.p12
 profiles.xml
+# Installationspakete (Build-Ergebnis, wie app/dist)
+*.wgt
