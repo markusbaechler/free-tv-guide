@@ -15,6 +15,18 @@ export interface Program {
   live: boolean | null;
   /** true = Wiederholung laut Quelle (SRG: `replica`), sonst false/null */
   rerun: boolean | null;
+  /** SRG: Video-URN der Sendung zum Nachsehen (EPG-Feld `vodUrn`), sonst null */
+  vodUrn?: string | null;
+}
+
+/** Sendung zum Nachsehen (replay.json) */
+export interface ReplayEntry {
+  title: string;
+  subtitle: string | null;
+  start: string;
+  end: string | null;
+  /** Video-URN für Pillarbox */
+  urn: string;
 }
 
 export interface Channel {
@@ -33,6 +45,8 @@ export interface Channel {
   /** Startparameter für die externe App (PAYLOAD), null = nur öffnen */
   deeplink: string | null;
   verified: boolean;
+  /** true = vergangene Sendungen zum Nachsehen (SRG-EPG mit Video-URN, replay.json) */
+  replay?: boolean;
   /** In der App abspielbar (erster srg-/direct-Weg): SRG-URN oder direkte Stream-Adresse. null = keiner */
   live?: LiveSource | null;
 }

@@ -11,15 +11,16 @@
 #           zattoo = Zattoo-App (Zattoo Free: Werbung beim Umschalten, 10 h/Monat am TV) – nur wenn es nichts anderes gibt
 # deeplink: Startparameter für die externe App (PAYLOAD); Joyn/Zattoo kennen keinen (SPEC.md 4.5a). null = nur App öffnen
 # verified: false = Empfang über den ersten Weg noch nicht am TV geprüft
+# replay:   true = vergangene Sendungen (7 Tage) zum Nachsehen, Video-URN aus der SRG-EPG (Feld vodUrn), Wiedergabe mit Pillarbox
 # favorites: Reihenfolge im Abschnitt «Favoriten» (Standardansicht im Tab Sender) und Zapp-Reihenfolge im Player
 
 favorites: [srf1, srf2, srfinfo, daserste, zdf, rtl, sat1, prosieben, vox, rtlzwei, kabeleins, eurosport1, sport1, 3sat, rts1, rts2, rsila1, rsila2, arte, phoenix, zdfneo, zdfinfo, dmax]
 
 channels:
   # --- SRG: SRG-API in der App (läuft, 1080p), Sat als Reserve (Sat Access, meist verschlüsselt)
-  - { id: srf1,    name: "SRF 1",    country: CH, epg: "srg:srf:srf-1",    sources: [srg, { kind: sat, names: ["SRF 1 HD", "SRF 1"] }], deeplink: null, verified: true }
-  - { id: srf2,    name: "SRF zwei", country: CH, epg: "srg:srf:srf-2",    sources: [srg, { kind: sat, names: ["SRF zwei HD", "SRF zwei"] }], deeplink: null, verified: true }
-  - { id: srfinfo, name: "SRF info", country: CH, epg: "srg:srf:srf-info", sources: [srg, { kind: sat, names: ["SRF info HD", "SRF info"] }], deeplink: null, verified: true }
+  - { id: srf1,    name: "SRF 1",    country: CH, epg: "srg:srf:srf-1",    sources: [srg, { kind: sat, names: ["SRF 1 HD", "SRF 1"] }], deeplink: null, verified: true, replay: true }
+  - { id: srf2,    name: "SRF zwei", country: CH, epg: "srg:srf:srf-2",    sources: [srg, { kind: sat, names: ["SRF zwei HD", "SRF zwei"] }], deeplink: null, verified: true, replay: true }
+  - { id: srfinfo, name: "SRF info", country: CH, epg: "srg:srf:srf-info", sources: [srg, { kind: sat, names: ["SRF info HD", "SRF info"] }], deeplink: null, verified: true, replay: true }
   - { id: rts1,    name: "RTS 1",    country: CH, epg: "srg:rts:rts-1",    sources: [srg, { kind: sat, names: ["RTS 1 HD", "RTS Un HD", "RTS 1", "RTS Un"] }], deeplink: null, verified: false }
   - { id: rts2,    name: "RTS 2",    country: CH, epg: "srg:rts:rts-2",    sources: [srg, { kind: sat, names: ["RTS 2 HD", "RTS Deux HD", "RTS 2", "RTS Deux"] }], deeplink: null, verified: false }
   - { id: rsila1,  name: "RSI LA 1", country: CH, epg: "srg:rsi:la-1",     sources: [srg, { kind: sat, names: ["RSI LA 1 HD", "RSI La 1 HD", "RSI LA 1", "RSI La 1"] }], deeplink: null, verified: false }

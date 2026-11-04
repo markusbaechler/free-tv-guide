@@ -10,6 +10,7 @@ import { buildEvent, checkRights } from './rights.ts';
 import { extractPrograms, fetchDay, fillEndTimes, getToken, normalizeProgram, shapeOf, SrgError } from './sources/srg.ts';
 import { fetchLivestreams, matchChannel, type LiveStream } from './sources/srg-live.ts';
 import { addDays, zurichDate, zurichLocalToUtc } from './time.ts';
+import { buildReplay, needsPastFetch, REPLAY_DAYS } from './replay.ts';
 import type { Channel, RulesJson, GuideEvent, Program } from './types.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -52,7 +53,8 @@ function readCache(channel: string, date: string): CacheEntry | null {
 function pruneCache(): void {
   const base = join(OUT_DIR, 'cache', 'srg');
   if (!existsSync(base)) return;
-  const oldest = addDays(today, -1);
+  // Vergangene Tage bleiben für «Nachsehen» erhalten
+  const oldest = addDays(today, -REPLAY_DAYS);
   for (const ch of readdirSync(base)) {
     const dir = join(base, ch);
     if (!statSync(dir).isDirectory()) continue;
@@ -71,6 +73,9 @@ function needsFetch(date: string, cache: CacheEntry | null): boolean {
 async function loadSrg(channels: Channel[]): Promise<{ programs: Program[]; status: SrgStatus; fetched: number; cached: number; failed: number; token: string | null }> {
   const srgChannels = channels.filter((c) => c.epg?.startsWith('srg:'));
   const dates = Array.from({ length: DAYS }, (_, i) => addDays(today, i));
+  // Sender mit «Nachsehen»: zusätzlich die letzten 7 Tage (Video-URN kommt oft erst nach der Ausstrahlung)
+  const pastDates = Array.from({ length: REPLAY_DAYS }, (_, i) => addDays(today, i - REPLAY_DAYS));
+  const yesterday = addDays(today, -1);
   const id = process.env.SRG_CLIENT_ID;
   const secret = process.env.SRG_CLIENT_SECRET;
 
@@ -97,9 +102,10 @@ async function loadSrg(channels: Channel[]): Promise<{ programs: Program[]; stat
   for (const ch of srgChannels) {
     const [, bu, station] = ch.epg!.split(':') as [string, string, string];
     const perChannel: Program[] = [];
-    for (const date of dates) {
+    for (const date of (ch.replay ? pastDates : []).concat(dates)) {
       const cache = readCache(ch.id, date);
-      if (token && needsFetch(date, cache)) {
+      const stale = date < today ? needsPastFetch(date, yesterday, cache, now.getTime(), CACHE_MAX_AGE_H) : needsFetch(date, cache);
+      if (token && stale) {
         try {
           const payload = await fetchDay(token, bu, station, date);
           if (!shapes[bu]) shapes[bu] = shapeOf(payload);
@@ -246,6 +252,20 @@ async function main(): Promise<void> {
   }
   for (const list of Object.values(epg)) list.sort((a, b) => a.start.localeCompare(b.start));
 
+  // --- Nachsehen (replay.json) ---
+  const replayIds = new Set(channels.filter((c) => c.replay).map((c) => c.id));
+  const replayFrom = zurichLocalToUtc(`${addDays(today, -REPLAY_DAYS)} 00:00`);
+  const replay = buildReplay(srg.programs, replayIds, nowIso, replayFrom);
+  // Abdeckung je Sender und Tag: Sendungen gesamt / mit Video-URN (Kontrolle, ob die SRG das Feld füllt)
+  const coverage: Record<string, Record<string, [number, number]>> = {};
+  for (const p of srg.programs) {
+    if (!replayIds.has(p.channel)) continue;
+    const day = zurichDate(new Date(p.start));
+    const c = ((coverage[p.channel] ??= {})[day] ??= [0, 0]);
+    c[0]++;
+    if (p.vodUrn) c[1]++;
+  }
+
   const bySport = { football: 0, icehockey: 0, motorsport: 0 };
   for (const e of eventList) bySport[e.sport]++;
 
@@ -255,6 +275,7 @@ async function main(): Promise<void> {
     attribution: 'Programmdaten: SRG SSR (developer.srgssr.ch)',
     srg: { status: srg.status, fetchedDays: srg.fetched, cachedDays: srg.cached, failedDays: srg.failed },
     livestreams: { channels: live.ok, failedRequests: live.failed },
+    replay: { channels: Object.keys(replay).length, programs: Object.values(replay).reduce((n, l) => n + l.length, 0) },
     counts: { events: eventList.length, bySport, manual: eventList.filter((e) => e.source === 'manual').length, unclassified: unclassified.length, rejected: rejected.length },
     warnings,
   };
@@ -274,11 +295,14 @@ async function main(): Promise<void> {
   for (const [id, r] of rights) rulesJson.rights[id] = { name: r.name, sport: r.sport, reception: r.reception };
   writeJson('rules.json', rulesJson);
   writeJson('epg.json', { generatedAt: nowIso, channels: epg });
+  writeJson('replay.json', { generatedAt: nowIso, channels: replay });
+  writeJson('debug/replay-coverage.json', coverage);
   writeJson('meta.json', meta);
   writeJson('debug/unclassified.json', unclassified);
   writeJson('debug/rejected.json', rejected);
 
   console.log(`Events: ${eventList.length} (Fussball ${bySport.football}, Eishockey ${bySport.icehockey}, Motorsport ${bySport.motorsport})`);
+  console.log(`Nachsehen: ${meta.replay.programs} Sendungen`);
   console.log(`SRG: ${srg.status} · geladen ${srg.fetched} · Cache ${srg.cached} · Fehler ${srg.failed}`);
   console.log(`Nicht klassifiziert (Sportbezug): ${unclassified.length} · abgelehnt: ${rejected.length}`);
   for (const w of warnings) console.log(`::warning::${w}`);

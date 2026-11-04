@@ -2,7 +2,7 @@
 //   Token:  POST https://api.srgssr.ch/oauth/v1/accesstoken?grant_type=client_credentials  (Basic Auth)
 //   EPG:    GET  https://api.srgssr.ch/epg/v3/{bu}/tv/stations/{station}?date=YYYY-MM-DD
 // Antwort laut OpenAPI 3.0.8: Array von { title, shortDescription, longDescription, dateTimes{startTime,endTime},
-// isLive, replica, … }. Tatsächlich zusätzlich: subTitle, genre (String), repetitionDescription. Trotzdem defensiv gelesen; Struktur in debug/srg-shape.json.
+// isLive, replica, … }. Tatsächlich zusätzlich: subTitle, genre (String), repetitionDescription, vodUrn/vodUrl (Nachsehen). Trotzdem defensiv gelesen; Struktur in debug/srg-shape.json.
 
 import type { Program } from '../types.ts';
 import { toUtc } from '../time.ts';
@@ -101,6 +101,11 @@ function genreText(v: unknown): string | null {
   return null;
 }
 
+/** Abspielbare SRG-Video-URN (Pillarbox), sonst null */
+export function videoUrn(v: unknown): string | null {
+  return typeof v === 'string' && /^urn:(srf|rts|rsi|rtr|swi):video:[A-Za-z0-9-]+$/.test(v.trim()) ? v.trim() : null;
+}
+
 function bool(v: unknown): boolean | null {
   return typeof v === 'boolean' ? v : null;
 }
@@ -133,6 +138,7 @@ export function normalizeProgram(raw: unknown, channel: string): Program | null 
     genre: genreText(o.genre ?? o.genres ?? o.category ?? o.categories ?? o.contentClassification),
     live: bool(o.isLive) ?? bool(o.live) ?? bool(o.liveBroadcast),
     rerun: bool(o.replica) ?? bool(o.isRerun) ?? bool(o.rerun) ?? (str(o.repetitionDescription) ? true : null),
+    vodUrn: videoUrn(o.vodUrn),
   };
 }
 

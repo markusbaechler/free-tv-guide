@@ -79,6 +79,8 @@ export function loadChannels(dir: string): Channel[] {
       }
     });
     if (sources.filter((x) => x.kind === 'srg').length > 1) fail(file, `${id}: srg höchstens einmal`);
+    if (c.replay != null && typeof c.replay !== 'boolean') fail(file, `${id}: replay muss true oder false sein`);
+    if (c.replay === true && !c.epg) fail(file, `${id}: replay braucht eine SRG-EPG-Quelle (epg)`);
     return {
       id,
       name: String(c.name),
@@ -87,6 +89,7 @@ export function loadChannels(dir: string): Channel[] {
       sources,
       deeplink: c.deeplink == null ? null : String(c.deeplink),
       verified: c.verified === true,
+      replay: c.replay === true,
     };
   });
 }
