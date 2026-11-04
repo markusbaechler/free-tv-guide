@@ -60,10 +60,26 @@ const check = (cond, msg) => (cond ? console.log('  ok   ' + msg) : (fails.push(
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
-page.on('pageerror', (e) => errors.push(String(e)));
+page.on('pageerror', (e) => { errors.push(String(e)); if (process.env.DEBUG_ERR) console.log('PAGEERROR', e.stack); });
 // Sammlung im Simulator schnell: 250 ms je Transponder (am TV 10 s); der Simulator «sammelt» Tabellen in 150 ms
 await page.addInitScript({ content: `window.__MOCK_CHANNELS__ = ${JSON.stringify(CHANNELS)}; window.__MOCK_EPG__ = ${JSON.stringify(EPG)}; window.__FTG_HARVEST_DWELL__ = 250;` });
 await page.addInitScript({ content: readFileSync(join(APP, 'test-tv', 'mock-tizen.js'), 'utf8') });
+// Nachsehen: feste Testdaten statt replay.json aus dem Branch «data»
+const dayZ = (offset) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich' }).format(new Date(now + offset * 86400000));
+const TODAY = dayZ(0);
+const YESTERDAY = dayZ(-1);
+const zt = (day, hm) => new Date(new Date(day + 'T' + hm + ':00Z').getTime() - 60 * 60000).toISOString(); // MEZ
+const REPLAY = {
+  srf1: [
+    { title: 'Meteo', subtitle: 'Abendausgabe', start: zt(TODAY, '00:05'), end: zt(TODAY, '00:10'), urn: 'urn:srf:video:meteo' },
+    { title: 'Tagesschau', subtitle: 'Mittagsausgabe', start: zt(TODAY, '00:00'), end: zt(TODAY, '00:05'), urn: 'urn:srf:video:ts' },
+    { title: 'Gestern-Sendung', subtitle: null, start: zt(YESTERDAY, '20:05'), end: zt(YESTERDAY, '21:00'), urn: 'urn:srf:video:gestern' },
+  ],
+  srf2: [{ title: 'Sportflash', subtitle: 'Die Sportnews des Tages', start: zt(TODAY, '00:01'), end: zt(TODAY, '00:03'), urn: 'urn:srf:video:sf' }],
+  srfinfo: [{ title: 'Meteo', subtitle: 'Abendausgabe', start: zt(TODAY, '00:30'), end: zt(TODAY, '00:35'), urn: 'urn:srf:video:meteo' }],
+};
+await page.route('**/replay.json*', (route) => route.fulfill({ contentType: 'application/json', body: JSON.stringify({ channels: REPLAY }) }));
+await page.addInitScript({ content: `try { localStorage.setItem('ftg:resume:v1', JSON.stringify({ 'urn:srf:video:gestern': { pos: 720, at: 1 } })); } catch (e) {}` });
 await page.goto(`http://localhost:${port}/`);
 await page.waitForTimeout(3500); // Daten laden, Tuner lesen, erste EPG-Abrufe (nur jetzt/danach), Sammlung startet nach 2 s
 
@@ -121,6 +137,45 @@ check(/Relegation Hinspiel/.test(sport), 'Bundesliga-Spiel am Tag 3 gefunden (EP
 check(/Sat-EPG-Einträge: (4[0-9]|[5-9][0-9])/.test(diag), 'EPG-Einträge ≥ 40 trotz 12er-Limit je Abruf: ' + (diag.match(/Sat-EPG-Einträge: \d+/) || [''])[0]);
 check(!/Snooker/.test(sport), 'Snooker (keine Zielsportart) nicht im Sport-Tab');
 
+console.log('Tab Nachsehen:');
+await page.click('[data-key="tab:replay"]');
+await page.waitForTimeout(400);
+const rp = await page.evaluate(() => ({
+  filters: Array.from(document.querySelectorAll('.replay .filter')).map((b) => b.innerText),
+  rows: Array.from(document.querySelectorAll('.replay .row')).map((r) => r.innerText.replace(/\n/g, ' | ')),
+  fits: Array.from(document.querySelectorAll('.replay .filter')).every((b) => b.getBoundingClientRect().bottom <= 1080),
+}));
+check(rp.filters.join(',').indexOf('Alle,SRF 1,SRF zwei,SRF info,Heute,Gestern') === 0 && rp.filters.length === 11, 'Filter: Sender + 7 Tage: ' + rp.filters.join(', '));
+check(rp.fits, 'Alle Filter sichtbar (passen in 1080 px)');
+check(rp.rows.length >= 3 && rp.rows.some((r) => /Tagesschau/.test(r)), 'Heute: Sendungen zum Nachsehen (' + rp.rows.length + '): ' + rp.rows.slice(0, 2).join(' ‖ '));
+check(rp.rows.filter((r) => /Meteo/.test(r)).length === 1 && rp.rows.some((r) => /Meteo.*SRF 1/.test(r)), 'Gleiche Sendung auf SRF 1 und SRF info nur einmal (Erstausstrahlung SRF 1)');
+await page.click('[data-key="rpday:' + YESTERDAY + '"]');
+await page.waitForTimeout(300);
+const rpY = await page.evaluate(() => Array.from(document.querySelectorAll('.replay .row')).map((r) => r.innerText.replace(/\n/g, ' | ')));
+check(rpY.length === 1 && /Gestern-Sendung/.test(rpY[0]) && /weiter ab 12:00/.test(rpY[0]), 'Gestern: 1 Sendung mit gemerkter Position: ' + rpY.join(' ‖ '));
+await page.click('[data-key="rpday:' + TODAY + '"]');
+await page.click('[data-key="rpch:srf2"]');
+await page.waitForTimeout(300);
+const rpS2 = await page.evaluate(() => Array.from(document.querySelectorAll('.replay .row')).map((r) => r.innerText.replace(/\n/g, ' | ')));
+check(rpS2.length === 1 && /SRF zwei/.test(rpS2[0]), 'Filter SRF zwei: ' + rpS2.join(' ‖ '));
+await page.click('[data-key="rpch:all"]');
+await page.waitForTimeout(300);
+const rowKey = await page.evaluate(() => document.querySelector('.replay .row').getAttribute('data-key'));
+await page.evaluate(() => { window.__MOCK_LOG__.length = 0; });
+await page.click('[data-key="' + rowKey + '"]');
+await page.waitForTimeout(1500);
+let vp = await page.evaluate(() => ({ playing: !document.getElementById('player').hidden, info: (document.getElementById('player-info') || {}).innerText || '' }));
+check(vp.playing && /SRF 1 · Heute/.test(vp.info) && /Pause/.test(vp.info), 'OK öffnet den Player mit Titel und Spul-Hinweis: ' + vp.info.replace(/\n/g, ' | ').slice(0, 160));
+await page.keyboard.press('ArrowDown');
+await page.keyboard.press('ArrowRight');
+await page.waitForTimeout(400);
+vp = await page.evaluate(() => ({ playing: !document.getElementById('player').hidden, sat: document.documentElement.classList.contains('is-sat'), picker: document.getElementById('picker').hidden, log: window.__MOCK_LOG__.slice() }));
+check(vp.playing && !vp.sat && vp.picker && !vp.log.some((l) => /^tune/.test(l)), 'Pfeiltasten spulen statt zappen (kein Senderwechsel, keine Favoritenleiste)');
+await page.keyboard.press('Backspace');
+await page.waitForTimeout(500);
+vp = await page.evaluate((k) => ({ playing: !document.getElementById('player').hidden, focus: (document.querySelector('.is-focused') || {}).getAttribute && document.querySelector('.is-focused').getAttribute('data-key'), tab: (document.querySelector('.tab.is-active') || {}).innerText }), rowKey);
+check(!vp.playing && vp.tab === 'Nachsehen' && vp.focus === rowKey, 'Zurück → Liste, Fokus auf der Sendung');
+
 console.log('Tastenlogger:');
 await page.click('[data-key="tab:channels"]');
 await page.waitForTimeout(300);
@@ -173,9 +228,13 @@ st = await page.evaluate(() => ({ info: (document.getElementById('sat-info') || 
 check(/ProSieben/.test(st.info), 'Play/Pause → letzter Sender (ProSieben): ' + st.info.split('\n')[0]);
 await page.waitForTimeout(1600);
 await page.keyboard.press('Digit1');
-await page.waitForTimeout(1900);
-st = await page.evaluate(() => ({ sat: document.documentElement.classList.contains('is-sat'), playing: !document.getElementById('player').hidden }));
+// Player-Bündel ist schon geladen (Nachsehen): im Simulator ohne SRG-Netz kommt der Stream-Fehler (→ Sat-Reserve) schnell,
+// deshalb auf den Zustand warten statt fest 1,9 s
+st = await page
+  .waitForFunction(() => !document.documentElement.classList.contains('is-sat') && !document.getElementById('player').hidden, null, { timeout: 2500, polling: 50 })
+  .then(() => ({ sat: false, playing: true }), () => ({ sat: true, playing: false }));
 check(!st.sat && st.playing, 'Ziffer 1 → SRF 1: Sat-Bild zu, Stream-Player offen');
+await page.waitForTimeout(1500);
 await page.keyboard.press('Backspace');
 await page.waitForTimeout(600);
 

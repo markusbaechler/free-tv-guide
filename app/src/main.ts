@@ -2,10 +2,11 @@ import type { Channel, GuideEvent, Sport } from '../../pipeline/types.ts';
 import { loadData, nowNext, type EpgEntry, type GuideData } from './data.ts';
 import { clear, h } from './dom.ts';
 import { focusables, getFocused, findByKey, move, setFocus, type Dir } from './focus.ts';
-import { dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
+import { addDaysKey, dayKey, dayLabel, remaining, startsIn, time, weekdayShort } from './format.ts';
 import { applyFilter, displaySubtitle, displayTitle, groupEvents, isRunning, type EventGroup, type Filter, type Period, type SportFilter } from './group.ts';
 import { CHANNEL_PRIORITY, PLAYER_NOTE, PLAYERS, REFRESH_DATA_MS, REFRESH_VIEW_MS, type PlayerApp } from './settings.ts';
-import { closePlayer, currentPlayerChannel, isPlaying, openPlayer, playerKey, switchPlayerChannel, type PlayableChannel } from './player.ts';
+import { clock, closePlayer, currentPlayerChannel, isPlaying, isVodPlaying, openPlayer, openVod, playerKey, resumePosition, switchPlayerChannel, type PlayableChannel } from './player.ts';
+import type { ReplayEntry } from '../../pipeline/types.ts';
 import { exitApp, isTizen, keyRegistration, launchApp, registerKeys } from './tizen.ts';
 import { satEvents, unclassifiedSportTitles } from './satsport.ts';
 import { findByServiceId, readTunerCache, writeTunerCache, type TunerEpgSlot } from './tunercache.ts';
@@ -16,11 +17,12 @@ import { harvestActive, harvestStatus, startHarvest, stopHarvest, transponderGro
 declare const __APP_VERSION__: string;
 const APP_VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : 'dev';
 
-type Tab = 'live' | 'sport' | 'channels';
+type Tab = 'live' | 'sport' | 'replay' | 'channels';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'live', label: 'Jetzt' },
   { id: 'sport', label: 'Sport' },
+  { id: 'replay', label: 'Nachsehen' },
   { id: 'channels', label: 'Sender' },
 ];
 
@@ -29,6 +31,8 @@ const SPORT_LABEL: Record<Sport, string> = { football: 'Fussball', icehockey: 'E
 const state = {
   tab: 'live' as Tab,
   filter: { sport: 'all', period: 'today', secondary: false } as Filter,
+  /** Tab «Nachsehen»: Tag (YYYY-MM-DD, Zürich) und Sender ('all' = alle) */
+  replay: { day: '', channel: 'all' },
   data: null as GuideData | null,
   loading: true,
   overlay: null as null | 'watch' | 'exit',
@@ -221,6 +225,95 @@ function renderSport(main: HTMLElement, now: Date): void {
     }
   }
   main.appendChild(h('section', { class: 'sport' }, aside, board));
+}
+
+// ---------------------------------------------------------------- Tab «Nachsehen»
+
+const REPLAY_DAYS = 7;
+
+interface ReplayRow extends ReplayEntry {
+  channel: string;
+}
+
+/** Sender mit Nachsehen (replay: true) in Favoriten-Reihenfolge */
+function replayChannels(): Channel[] {
+  return orderedChannels().filter((c) => c.replay);
+}
+
+/** Sendungen eines Tages, neueste zuerst; dieselbe Sendung auf zwei Sendern (z. B. Tagesschau auf SRF info) nur einmal, mit der Erstausstrahlung */
+function replayRows(day: string, channel: string): ReplayRow[] {
+  if (!state.data) return [];
+  const all: ReplayRow[] = [];
+  for (const c of replayChannels()) {
+    if (channel !== 'all' && c.id !== channel) continue;
+    for (const e of state.data.replay[c.id] || []) {
+      if (dayKey(e.start) === day) all.push({ channel: c.id, title: e.title, subtitle: e.subtitle, start: e.start, end: e.end, urn: e.urn });
+    }
+  }
+  all.sort((a, b) => a.start.localeCompare(b.start));
+  const seen: Record<string, boolean> = {};
+  const out = all.filter((r) => (seen[r.urn] ? false : (seen[r.urn] = true)));
+  return out.reverse();
+}
+
+function replayRow(r: ReplayRow, first: boolean): HTMLElement {
+  const min = r.end ? Math.round((new Date(r.end).getTime() - new Date(r.start).getTime()) / 60000) : 0;
+  const resume = resumePosition(r.urn);
+  return h(
+    'div',
+    { class: 'row row--replay', 'data-nav': true, 'data-key': 'rp:' + r.channel + ':' + r.urn, 'data-first': first },
+    h('div', { class: 'row__time' }, time(r.start), h('span', { class: 'row__when' }, min ? min + ' Min.' : '')),
+    h(
+      'div',
+      { class: 'row__body' },
+      h('div', { class: 'row__title' }, r.title),
+      r.subtitle || resume
+        ? h('div', { class: 'row__sub' }, resume ? h('span', { class: 'tag tag--resume' }, 'weiter ab ' + clock(resume)) : null, r.subtitle || '')
+        : null,
+    ),
+    h('div', { class: 'row__channel' }, h('span', { class: 'chan' }, channelName(r.channel))),
+  );
+}
+
+function renderReplay(main: HTMLElement, now: Date): void {
+  const today = dayKey(now);
+  const rs = state.replay;
+  if (!rs.day || rs.day > today || rs.day < addDaysKey(today, -REPLAY_DAYS)) rs.day = today;
+  const chans = replayChannels();
+  const aside = h('aside', { class: 'filters', 'data-nav-group': 'filters', 'data-nav-memory': 'off' }, h('h2', { class: 'filters__head' }, 'Sender'));
+  aside.appendChild(filterButton('rpch:all', 'Alle', rs.channel === 'all'));
+  for (const c of chans) aside.appendChild(filterButton('rpch:' + c.id, c.name, rs.channel === c.id));
+  aside.appendChild(h('h2', { class: 'filters__head' }, 'Tag'));
+  for (let i = 0; i <= REPLAY_DAYS - 1; i++) {
+    const d = addDaysKey(today, -i);
+    aside.appendChild(filterButton('rpday:' + d, i === 0 ? 'Heute' : i === 1 ? 'Gestern' : dayLabel(d, now), rs.day === d));
+  }
+
+  const board = h('div', { class: 'board', 'data-scroll': true, 'data-nav-group': 'board' });
+  const rows = replayRows(rs.day, rs.channel);
+  if (!chans.length || !Object.keys(state.data ? state.data.replay : {}).length) {
+    board.appendChild(h('p', { class: 'note' }, 'Noch keine Sendungen zum Nachsehen geladen.'));
+  } else if (!rows.length) {
+    board.appendChild(h('p', { class: 'note' }, rs.day === today ? 'Heute ist noch nichts zum Nachsehen da.' : 'An diesem Tag gibt es nichts zum Nachsehen.'));
+  } else {
+    board.appendChild(h('p', { class: 'note' }, 'SRF Play: was die SRG online stellt. Spielfilme und Sport fehlen oft (Rechte).'));
+    rows.forEach((r, i) => board.appendChild(replayRow(r, i === 0)));
+  }
+  main.appendChild(h('section', { class: 'sport replay' }, aside, board));
+}
+
+function playReplay(channelId: string, urn: string): void {
+  if (afterHarvest(() => playReplay(channelId, urn))) return;
+  const list = state.data ? state.data.replay[channelId] || [] : [];
+  const e = list.filter((x) => x.urn === urn)[0];
+  if (!e) return;
+  rememberFocus();
+  const meta = channelName(channelId) + ' · ' + dayLabel(dayKey(e.start), new Date()) + ' ' + time(e.start);
+  openVod({ urn: e.urn, title: e.title, subtitle: e.subtitle, meta }, () => {
+    render();
+    const back = focusBeforeOverlay ? findByKey(focusBeforeOverlay) : null;
+    if (back) setFocus(back);
+  });
 }
 
 // ---------------------------------------------------------------- Tab «Jetzt live»
@@ -1092,6 +1185,7 @@ function render(): void {
     if (state.loading) main.appendChild(h('p', { class: 'note note--center' }, 'Programm wird geladen …'));
     else main.appendChild(emptyState('Keine Verbindung zum Programm-Server. Bitte Netzwerk des Fernsehers prüfen.', { label: 'Erneut laden', key: 'reload' }));
   } else if (state.tab === 'sport') renderSport(main, now);
+  else if (state.tab === 'replay') renderReplay(main, now);
   else if (state.tab === 'live') renderLive(main, now);
   else renderChannels(main, now);
 
@@ -1334,6 +1428,18 @@ function activate(el: HTMLElement): void {
     return openWatch(g.primary.channel, displayTitle(g.primary), g, null);
   }
   if (kind === 'ch') return watch(value, null, null);
+  if (kind === 'rpch') {
+    state.replay.channel = value;
+    return render();
+  }
+  if (kind === 'rpday') {
+    state.replay.day = value;
+    return render();
+  }
+  if (kind === 'rp') {
+    const sep = value.indexOf(':');
+    return playReplay(value.slice(0, sep), value.slice(sep + 1));
+  }
   if (kind === 'later') {
     const sep = value.indexOf(':');
     const id = value.slice(0, sep);
@@ -1374,6 +1480,11 @@ const KEY = { left: 37, up: 38, right: 39, down: 40, enter: 13, back: 10009, bac
 
 function onKey(e: KeyboardEvent): void {
   const code = e.keyCode;
+  // Nachsehen: Spulen und Pause statt Zappen
+  if (isVodPlaying() && playerKey(code)) {
+    e.preventDefault();
+    return;
+  }
   if (satKey(code)) {
     e.preventDefault();
     return;

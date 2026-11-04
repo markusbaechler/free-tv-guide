@@ -1,4 +1,4 @@
-import type { Channel, GuideEvent, RulesJson } from '../../pipeline/types.ts';
+import type { Channel, GuideEvent, ReplayEntry, RulesJson } from '../../pipeline/types.ts';
 import { DATA_BASE } from './settings.ts';
 
 export interface EpgEntry {
@@ -22,6 +22,8 @@ export interface GuideData {
   /** Regeln für die Sport-Erkennung in der App (Sat-EPG); null = nicht geladen */
   rules: RulesJson | null;
   epg: Record<string, EpgEntry[]>;
+  /** Vergangene Sendungen mit Video-URN je Sender (Nachsehen), neueste zuerst; leer = keine Daten */
+  replay: Record<string, ReplayEntry[]>;
   meta: Meta;
   /** Zeitpunkt, an dem die App die Daten erfolgreich geladen hat */
   loadedAt: string;
@@ -74,14 +76,16 @@ export function loadData(): Promise<GuideData | null> {
     getJson<{ channels: Record<string, EpgEntry[]> }>('epg.json'),
     getJson<Meta>('meta.json'),
     getJson<RulesJson>('rules.json').catch(() => null),
+    getJson<{ channels: Record<string, ReplayEntry[]> }>('replay.json').catch(() => null),
   ])
-    .then(([ev, ch, epg, meta, rules]) => {
+    .then(([ev, ch, epg, meta, rules, replay]) => {
       const d: GuideData = {
         events: ev.events,
         channels: ch.channels,
         favorites: ch.favorites || [],
         rules,
         epg: epg.channels,
+        replay: replay ? replay.channels : {},
         meta,
         loadedAt: new Date().toISOString(),
         fromCache: false,
@@ -92,6 +96,7 @@ export function loadData(): Promise<GuideData | null> {
     .catch(() => {
       const c = readCache();
       if (c) c.fromCache = true;
+      if (c && !c.replay) c.replay = {};
       return c;
     });
 }

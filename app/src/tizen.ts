@@ -35,7 +35,7 @@ export function registerKeys(): void {
   const keys = [
     'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue', 'ChannelUp', 'ChannelDown',
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-    'Info', 'PreCh', 'MediaPlayPause', 'MediaPlay', 'MediaPause', 'ChannelList', 'Guide', 'Tools', 'Extra', 'Caption',
+    'Info', 'PreCh', 'MediaPlayPause', 'MediaPlay', 'MediaPause', 'MediaRewind', 'MediaFastForward', 'ChannelList', 'Guide', 'Tools', 'Extra', 'Caption',
   ];
   for (const k of keys) {
     try {

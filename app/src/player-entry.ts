@@ -17,6 +17,11 @@ interface PlayerHandle {
   onPlaying(cb: () => void): void;
   /** Aktuelle Bildgrösse des Streams, z. B. «1280×720», null solange unbekannt */
   quality(): string | null;
+  /** Nachsehen: Wiedergabe anhalten/fortsetzen, Sprung um Sekunden, Position/Dauer in Sekunden */
+  togglePause(): boolean;
+  seekBy(seconds: number): void;
+  seekTo(seconds: number): void;
+  position(): { pos: number; dur: number; paused: boolean };
   dispose(): void;
 }
 
@@ -27,6 +32,10 @@ function create(elementId: string): PlayerHandle {
     autoplay: true,
     muted: false,
     fill: true,
+    // Pillarbox-Qualitätsmonitoring aus: es wertet Fehler asynchron aus und greift dabei auf den Player zu,
+    // den die App beim Wechsel auf den nächsten Empfangsweg bereits entsorgt hat (TypeError im Hintergrund).
+    // Die SRG-Nutzungsmessung (srgAnalytics) bleibt an.
+    trackers: { pillarboxMonitoring: false },
     html5: {
       vhs: {
         useForcedSubtitles: true,
@@ -50,7 +59,10 @@ function create(elementId: string): PlayerHandle {
     onError(cb) {
       player.on('error', () => {
         const err = player.error();
-        cb(err && err.message ? String(err.message) : 'Unbekannter Fehler');
+        const msg = err && err.message ? String(err.message) : 'Unbekannter Fehler';
+        // Erst nach den übrigen Fehler-Empfängern von Pillarbox (Monitoring liest noch die Tonspur);
+        // ein sofortiges dispose() beim Wechsel auf den nächsten Empfangsweg liesse sie ins Leere greifen
+        window.setTimeout(() => cb(msg), 0);
       });
     },
     onPlaying(cb) {
@@ -60,6 +72,27 @@ function create(elementId: string): PlayerHandle {
       const w = Number(player.videoWidth && player.videoWidth()) || 0;
       const ht = Number(player.videoHeight && player.videoHeight()) || 0;
       return w && ht ? w + '×' + ht : null;
+    },
+    togglePause() {
+      if (player.paused()) {
+        const p = player.play();
+        if (p && typeof p.catch === 'function') p.catch(() => undefined);
+        return false;
+      }
+      player.pause();
+      return true;
+    },
+    seekBy(seconds: number) {
+      const dur = Number(player.duration()) || 0;
+      const t = Math.max(0, (Number(player.currentTime()) || 0) + seconds);
+      player.currentTime(dur > 0 ? Math.min(t, dur - 5) : t);
+    },
+    seekTo(seconds: number) {
+      player.currentTime(Math.max(0, seconds));
+    },
+    position() {
+      const dur = Number(player.duration());
+      return { pos: Number(player.currentTime()) || 0, dur: isFinite(dur) ? dur : 0, paused: !!player.paused() };
     },
     dispose() {
       player.dispose();

@@ -69,6 +69,14 @@ Eine Tizen-Web-App mit drei Bereichen:
   - **Motorsport:** F1 (Qualifying, Sprint, Rennen), MotoGP
 - Quellen der Events: Pipeline (SRG-EPG, Rechteprüfung nach `rights.yaml`) **und** seit v0.9 das Sat-Programm der zugeordneten Sat-Sender, in der App mit denselben Regeln klassifiziert (`rules.json`, publiziert von der Pipeline). Für Sat-Sender keine Senderrechte-Prüfung: Was im Signal eines frei empfangbaren Senders steht, läuft dort. Sat-Events werden nicht mit anderen Sendern zusammengelegt (nur SRG-Parallelausstrahlungen).
 
+### 4.3a Tab «Nachsehen» (neu 4.11.2026, v0.14)
+
+- Vergangene Sendungen der Sender mit `replay: true` in `channels.yaml` (SRF 1, SRF zwei, SRF info) der letzten **7 Tage**, abgespielt mit Pillarbox über die Video-URN der Sendung – dieselbe offizielle Kette wie bei den Livestreams. Kein eigenes Aufzeichnen, kein Replay im Sinn des GT12: nur was die SRG selbst auf SRF Play anbietet.
+- Filter links: Sender (Alle, SRF 1, SRF zwei, SRF info) und Tag (Heute, Gestern, 5 weitere Tage). Liste: neueste Sendung zuerst, Startzeit, Dauer, Titel, Untertitel, Sender. Dieselbe Sendung auf zwei Sendern (z. B. Tagesschau-Wiederholung auf SRF info, gleiche URN) erscheint einmal, mit der Erstausstrahlung.
+- Player: OK/Play/Pause = Pause, Links/Rechts sowie ⏪/⏩ = 30 s, Hoch/Runter = ±5 Min., 0 = Anfang, Zurück = Liste (Fokus bleibt auf der Sendung). Info-Leiste mit Balken und Position. Kein Zappen und keine Favoritenleiste im Nachsehen.
+- **Fortsetzen:** Position je URN in `localStorage` (`ftg:resume:v1`, max. 40 Einträge), erst ab 1 Min., gelöscht in den letzten 3 Min. Die Liste zeigt «weiter ab mm:ss».
+- Nicht abrufbar (Rechte nur live, z. B. Sport und Spielfilme; noch nicht online; abgelaufen): Pillarbox meldet den Fehler, die Info-Leiste erklärt ihn. Erfahrungswert erster Lauf 4.11.2026: Video-URN bei SRF 1 ca. 75 %, SRF zwei ca. 55 %, SRF info ca. 80 % der Sendungen.
+
 ### 4.4 Tab «Sender»
 
 - Abschnitt «Favoriten» zuoberst (Reihenfolge aus `favorites`), danach Schweiz / Deutschland / Österreich. Pro Kachel: Name, «Jetzt» und «Danach», sofern EPG vorhanden, sonst der Empfangsweg («Livestream», «Sat · Kanal N», «über Joyn», «Nicht im Sat-Tuner · über Joyn»).
@@ -129,6 +137,7 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 | SRG SSR EPG API v3 (developer.srgssr.ch) | EPG SRF 1, SRF zwei, SRF info, RTS 1/2, RSI LA 1/2 | Gratis-Registrierung, Produkt «SRG SSR PUBLIC API V2». Token: `POST https://api.srgssr.ch/oauth/v1/accesstoken?grant_type=client_credentials` (Basic Auth). Daten: `GET /epg/v3/{bu}/tv/stations/{station}?date=YYYY-MM-DD` | Fakt (OpenAPI 3.0.8 im Portal: Antwort = Array mit `title`, `subTitle`, `shortDescription`, `dateTimes`, `isLive`, `replica`, `genre`). **Achtung:** Das Produkt «SRG SSR PUBLIC API V2» allein deckt `/epg/v3` nicht ab (404.01.001 «not enough privilege»). Der App muss zusätzlich «SRGSSR EPG V3» zugeordnet sein (erledigt 30.10.2026). ToS (Portalseite): Nutzung für beliebige Zwecke inkl. Websites und Apps erlaubt; Quellenangabe in `meta.json`. Kontingent unbekannt |
 | EPG Nicht-SRG-Sender | TV24, 3+, blue Zoom, ARD, ZDF, RTL usw. | **Keine Quelle mit klaren Nutzungsbedingungen gefunden** (Phase 1). Scraping von TV-Zeitschriften oder Zattoo bewusst ausgeschlossen. Tab «Sender» zeigt dort nur den Namen | Entscheid |
 | `manual_events.yaml` | Einzelne Events ohne EPG-Quelle | Manuell | Fallback |
+| SRG SSR EPG API v3, Feld `vodUrn` | Video-URN der Sendung auf SRF Play (Nachsehen, §4.3a) | Gleiche Abfrage wie EPG; für Sender mit `replay: true` zusätzlich die letzten 7 Tage (gestern bei jedem Lauf, ältere Tage höchstens alle 20 h, da die SRG die URN oft erst nach der Ausstrahlung einträgt) | Fakt (erster Lauf 4.11.2026, Abdeckung in `debug/replay-coverage.json`). Wiedergabe mit Pillarbox wie bei den Livestreams; Rechte, Ablauf und Geoblocking entscheidet die SRG beim Abspielen |
 | SRGSSR Video API v2 (`/videometadata/v2/livestreams?bu=…`) | Livestream-URN je SRG-Sender (für Pillarbox) | Gleiche Zugangsdaten wie EPG | Fakt. Portal: Livestreams dürfen in eigenen Websites und Apps abgespielt werden, mit Pillarbox |
 | CH Media Regionalsender (telezueri.ch, telebaern.tv, telem1.ch, tele1.ch, tvo-online.ch, je `/live`) | Livestream TeleZüri, TeleBärn, Tele M1, Tele 1, TVO | Gratis, ohne Login, DASH ohne DRM, aus CH abrufbar – **aber der CDN (oneplusstream-prod.akamaized.net) erlaubt nur CH-Media-Ursprünge (CORS)**: Abruf von fremden Seiten und vom TV scheitert (31.10.2026). Kein Proxy/Umweg | **Nicht nutzbar** → Joyn |
 | TeleBasel (telebasel.ch/livestream) | Livestream TeleBasel | Gratis, ohne Login, HLS bis 1080p, geprüft 31.10.2026 | Entscheid: `app: direct` |
@@ -172,7 +181,9 @@ TV-App ── fetch (HTTPS) ──► https://raw.githubusercontent.com/markusba
 ### 5.3b `epg.json` und `meta.json`
 
 - `epg.json`: pro SRG-Sender die Sendungen der nächsten 36 h (`title`, `subtitle`, `start`, `end`) für «Jetzt/Danach».
+- `replay.json` (seit 4.11.2026): je Sender mit `replay: true` die beendeten Sendungen der letzten 7 Tage mit Video-URN, neueste zuerst: `{ "channels": { "srf1": [ { "title", "subtitle", "start", "end", "urn": "urn:srf:video:…" } ] } }`. Nur URNs der Form `urn:<bu>:video:<id>`.
 - `meta.json`: `generatedAt`, SRG-Status (`ok | partial | missing-credentials | auth-error | error`), Zählwerte, Warnungen, Quellenangabe.
+- `debug/replay-coverage.json`: je Nachsehen-Sender und Tag `[Sendungen, davon mit Video-URN]`.
 - `debug/unclassified.json`: Sendungen mit Sportbezug ohne passende Regel → Grundlage für die Pflege von rules.yaml.
 
 ### 5.4 Schema `channels.json`
@@ -269,7 +280,8 @@ free-tv-guide/
 10. **Entwickler-Verbindung:** Nach Standby meldet Apps2Samsung «TV-Name konnte nicht gefunden werden», obwohl der TV im Scan erscheint. Abhilfe: TV neu starten (Power 5 s).
 11. **Chromium 63:** Prozent-Höhen in Flex-Kindern werden nicht aufgelöst (Listen liefen unter die Fusszeile, kein Scrollen). Hauptbereich und Listen haben feste Höhe 832 px.
 9. **Joyn Schweiz auf Samsung:** Joyn-App laut Herstellerangaben ab Samsung-Baujahr 2017; Verfügbarkeit im Schweizer Samsung-Store und Sport-Sperren (Geoblocking) bei ARD/ZDF über Joyn CH am TV prüfen.
-8. **Pillarbox auf Tizen 5.0 (Chromium ~63):** ✅ läuft auf dem Q70R inkl. DRM, 1920×1080 (31.10.2026).
+8. **Pillarbox auf Tizen 5.0 (Chromium ~63):** ✅ läuft auf dem Q70R inkl. DRM, 1920×1080 (31.10.2026). Das Pillarbox-Qualitätsmonitoring ist seit v0.14 aus (`trackers.pillarboxMonitoring: false`): Es wertete Fehler asynchron aus und griff dabei auf den schon entsorgten Player zu (TypeError beim Wechsel auf den nächsten Empfangsweg). SRG-Nutzungsmessung bleibt an.
+15. **Nachsehen am TV:** VOD-Wiedergabe (Spulen, Pause, Fortsetzen) im Simulator nur ohne SRG-Netz geprüft (Fehlerpfad); Abspielen echter Sendungen am TV nachweisen. Ablaufdaten der Sendungen kennt die App nicht – Liste zeigt alles mit URN der letzten 7 Tage.
 2. **EPG für Nicht-SRG-Sender:** keine Quelle mit klaren Nutzungsbedingungen. NHL, National League (TV24/3+), Challenge League (blue Zoom) und Bundesliga (Sat.1) nur über `manual_events.yaml`.
 7. **SRG-Feldnamen und Kontingent:** nicht offiziell dokumentiert. Pipeline liest defensiv, protokolliert die Struktur in `debug/srg-shape.json`; Regeln nach dem ersten echten Lauf anhand von `debug/unclassified.json` nachschärfen.
 3. **Bundesliga in CH:** Free-Empfang unklar. Im Guide als «Empfang unsicher» markieren, bis in Phase 4 verifiziert.

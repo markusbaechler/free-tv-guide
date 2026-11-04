@@ -495,3 +495,8 @@ button {
 .picker__item.is-current .picker__now { color: var(--focus-ink); }
 .picker__hint { margin-top: 18px; font-size: 24px; color: var(--muted); }
 .picker__digits { font-size: 64px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Nachsehen: 11 Filter (Sender + 7 Tage) müssen in 832 px passen */
+.replay .filter { padding-top: 9px; padding-bottom: 9px; }
+.replay .filters__head { margin-top: 20px; }
+.tag--resume { margin-left: 0; margin-right: 12px; }
