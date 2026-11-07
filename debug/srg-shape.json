@@ -1,0 +1,154 @@
+{
+  "srf": {
+    "channel": "string",
+    "businessUnit": "string",
+    "programs": [
+      {
+        "title": "string",
+        "shortDescription": "string",
+        "longDescription": "string",
+        "subTitle": "string",
+        "assetId": "string",
+        "vodUrn": "string",
+        "vodUrl": "string",
+        "remark": "null",
+        "dateTimes": {
+          "startTime": "string",
+          "endTime": "string",
+          "duration": "string",
+          "timezone": "string"
+        },
+        "adultWarning": "boolean",
+        "ageRating": "string",
+        "isLive": "boolean",
+        "replica": "boolean",
+        "repetitionDescription": "string",
+        "primeur": "boolean",
+        "hasSubtitle": "boolean",
+        "hasTwoLanguages": "boolean",
+        "mainLanguage": "string",
+        "secondLanguage": "string",
+        "hasSignLanguage": "boolean",
+        "hasVisualDescription": "boolean",
+        "isDolbyDigital": "boolean",
+        "geoBlocked": "null",
+        "longHtmlDesciption": "string",
+        "productionYear": "number",
+        "productionCountry": "string",
+        "genre": "string",
+        "seriesNumber": "string",
+        "episodeSeason": "string",
+        "lead": "string",
+        "episodeNumber": "string",
+        "episodeCount": "string",
+        "people": [
+          "object"
+        ],
+        "image": {
+          "url": "string",
+          "description": "string",
+          "representations": "object"
+        },
+        "printImages": [
+          "object"
+        ],
+        "seasonImages": "null",
+        "seriesImages": "null",
+        "printImageSources": [
+          "string"
+        ]
+      }
+    ]
+  },
+  "rts": {
+    "channel": "string",
+    "businessUnit": "string",
+    "programs": [
+      {
+        "title": "string",
+        "transmissionId": "string",
+        "shortDescription": "string",
+        "longDescription": "string",
+        "remark": "null",
+        "dateTimes": {
+          "startTime": "string",
+          "endTime": "string",
+          "timezone": "string",
+          "duration": "string"
+        },
+        "vodUrn": "string",
+        "adultWarning": "boolean",
+        "ageRating": "string",
+        "isLive": "boolean",
+        "replica": "boolean",
+        "repetitionDescription": "string",
+        "primeur": "boolean",
+        "hasSubtitle": "boolean",
+        "longHtmlDesciption": "string",
+        "productionYear": "number",
+        "productionCountry": "string",
+        "genre": "string",
+        "lead": "string",
+        "episodeSeason": "string",
+        "episodeNumber": "string",
+        "episodeCount": "string",
+        "people": [],
+        "image": {
+          "url": "string",
+          "description": "string"
+        },
+        "printImages": "null",
+        "seasonImages": "null",
+        "seriesImages": "null",
+        "printImageSources": "null"
+      }
+    ]
+  },
+  "rsi": {
+    "channel": "string",
+    "businessUnit": "string",
+    "programs": [
+      {
+        "title": "string",
+        "shortDescription": "string",
+        "longDescription": "string",
+        "remark": "null",
+        "dateTimes": {
+          "startTime": "string",
+          "endTime": "string",
+          "duration": "string",
+          "timezone": "string"
+        },
+        "vodUrn": "string",
+        "adultWarning": "boolean",
+        "ageRating": "string",
+        "isLive": "boolean",
+        "primeur": "boolean",
+        "hasSubtitle": "boolean",
+        "replica": "boolean",
+        "flagsignlanguage": "boolean",
+        "flagAudioDescription": "boolean",
+        "repetitionDescription": "string",
+        "geoBlocked": "null",
+        "longHtmlDesciption": "string",
+        "productionYear": "string",
+        "productionCountry": "string",
+        "genre": "string",
+        "seriesNumber": "string",
+        "episodeNumber": "string",
+        "people": [
+          "object"
+        ],
+        "image": {
+          "url": "string",
+          "description": "string",
+          "representations": "object"
+        },
+        "printImages": "null",
+        "seasonImages": "null",
+        "seriesImages": "null",
+        "printImageSources": "null"
+      }
+    ]
+  }
+}

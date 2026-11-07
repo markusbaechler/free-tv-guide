@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-11-07T06:05:12.608Z",
+  "window": {
+    "from": "2026-11-07",
+    "days": 8
+  },
+  "attribution": "Programmdaten: SRG SSR (developer.srgssr.ch)",
+  "srg": {
+    "status": "ok",
+    "fetchedDays": 38,
+    "cachedDays": 39,
+    "failedDays": 0
+  },
+  "livestreams": {
+    "channels": 15,
+    "failedRequests": 0
+  },
+  "replay": {
+    "channels": 3,
+    "programs": 758
+  },
+  "counts": {
+    "events": 60,
+    "bySport": {
+      "football": 33,
+      "icehockey": 9,
+      "motorsport": 18
+    },
+    "manual": 0,
+    "unclassified": 5,
+    "rejected": 0
+  },
+  "warnings": []
+}
