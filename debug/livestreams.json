@@ -1,0 +1,56 @@
+[
+  {
+    "bu": "srf",
+    "urn": "urn:srf:video:c4927fcf-e1a0-0001-7edd-1ef01d441651",
+    "title": "SRF 1 Live",
+    "channel": "srf1"
+  },
+  {
+    "bu": "srf",
+    "urn": "urn:srf:video:c49c1d64-9f60-0001-1c36-43c288c01a10",
+    "title": "SRF zwei Live",
+    "channel": "srf2"
+  },
+  {
+    "bu": "srf",
+    "urn": "urn:srf:video:c49c1d73-2f70-0001-138a-15e0c4ccd3d0",
+    "title": "SRF info live",
+    "channel": "srfinfo"
+  },
+  {
+    "bu": "rts",
+    "urn": "urn:rts:video:3608506",
+    "title": "RTS 1",
+    "channel": "rts1"
+  },
+  {
+    "bu": "rts",
+    "urn": "urn:rts:video:3608517",
+    "title": "RTS 2",
+    "channel": "rts2"
+  },
+  {
+    "bu": "rts",
+    "urn": "urn:rts:video:1967124",
+    "title": "RTS Info",
+    "channel": null
+  },
+  {
+    "bu": "rts",
+    "urn": "urn:rts:video:8841634",
+    "title": "RTS Couleur 3 en direct",
+    "channel": null
+  },
+  {
+    "bu": "rsi",
+    "urn": "urn:rsi:video:livestream_La1",
+    "title": "LA 1",
+    "channel": "rsila1"
+  },
+  {
+    "bu": "rsi",
+    "urn": "urn:rsi:video:livestream_La2",
+    "title": "LA 2",
+    "channel": "rsila2"
+  }
+]
